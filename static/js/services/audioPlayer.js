@@ -1,5 +1,40 @@
 let audioEl = null;
 let objectUrl = "";
+let nowPlaying = null;
+const listeners = new Set();
+
+export function getAudioElement() {
+  return audioEl;
+}
+
+export function getNowPlaying() {
+  return nowPlaying;
+}
+
+export function onNowPlayingChange(fn) {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+
+export function setNowPlaying(info) {
+  nowPlaying = info || null;
+  syncMediaSession();
+  notify();
+}
+
+export function clearNowPlaying() {
+  nowPlaying = null;
+  syncMediaSession();
+  notify();
+}
+
+export function notifyNowPlaying() {
+  notify();
+}
+
+export function isLessonPlaying(lessonId) {
+  return Boolean(nowPlaying?.kind === "lesson" && nowPlaying.lessonId === lessonId && audioEl);
+}
 
 export function stopAudio() {
   if (audioEl) {
@@ -16,6 +51,9 @@ export function stopAudio() {
     URL.revokeObjectURL(objectUrl);
     objectUrl = "";
   }
+  nowPlaying = null;
+  syncMediaSession();
+  notify();
 }
 
 export function attachAudio(blob) {
@@ -24,15 +62,15 @@ export function attachAudio(blob) {
   audioEl = new Audio();
   audioEl.preload = "metadata";
   audioEl.playsInline = true;
+  audioEl.setAttribute("playsinline", "true");
+  audioEl.setAttribute("webkit-playsinline", "true");
   audioEl.src = objectUrl;
-  return audioEl;
-}
-
-export function getAudioElement() {
+  wireAudio(audioEl);
   return audioEl;
 }
 
 export function swapAudio(blob) {
+  nowPlaying = null;
   if (objectUrl) {
     URL.revokeObjectURL(objectUrl);
     objectUrl = "";
@@ -43,6 +81,7 @@ export function swapAudio(blob) {
     audioEl.playsInline = true;
     audioEl.setAttribute("playsinline", "true");
     audioEl.setAttribute("webkit-playsinline", "true");
+    wireAudio(audioEl);
   } else {
     try {
       audioEl.pause();
@@ -53,5 +92,53 @@ export function swapAudio(blob) {
   objectUrl = URL.createObjectURL(blob);
   audioEl.src = objectUrl;
   audioEl.load();
+  notify();
   return audioEl;
+}
+
+export function toggleAudio() {
+  if (!audioEl) return;
+  if (audioEl.paused) audioEl.play().catch(() => {});
+  else audioEl.pause();
+}
+
+function notify() {
+  for (const fn of listeners) {
+    try {
+      fn(nowPlaying);
+    } catch (error) {
+      console.warn(error);
+    }
+  }
+}
+
+function wireAudio(el) {
+  if (el._nowPlayingWired) return;
+  el._nowPlayingWired = true;
+  el.addEventListener("play", notify);
+  el.addEventListener("pause", notify);
+  el.addEventListener("ended", () => {
+    if (el.loop) return;
+    stopAudio();
+  });
+}
+
+function syncMediaSession() {
+  if (!("mediaSession" in navigator)) return;
+  try {
+    if (!nowPlaying) {
+      navigator.mediaSession.metadata = null;
+      return;
+    }
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: nowPlaying.fileName || nowPlaying.title || "Listening",
+      artist: nowPlaying.title || "Listening Reader",
+      album: nowPlaying.subtitle || "",
+    });
+    navigator.mediaSession.setActionHandler("play", () => toggleAudio());
+    navigator.mediaSession.setActionHandler("pause", () => audioEl?.pause());
+    navigator.mediaSession.setActionHandler("stop", () => stopAudio());
+  } catch {
+    /* ignore */
+  }
 }

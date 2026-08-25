@@ -7,7 +7,7 @@ import subprocess
 import http.server
 import socketserver
 from pathlib import Path
-from urllib.parse import unquote
+from urllib.parse import quote, unquote
 
 import cloud_push
 import store
@@ -121,7 +121,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 200,
                 blob["data"],
                 blob["mimeType"],
-                {"X-File-Name": blob["fileName"] or ""},
+                {"X-File-Name": quote(blob["fileName"] or "", safe="")},
             )
             return
         return super().do_GET()

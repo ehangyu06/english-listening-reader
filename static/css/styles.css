@@ -12,6 +12,7 @@
   --shadow: 0 10px 30px rgba(44, 42, 38, 0.06);
   --radius: 18px;
   --nav: 72px;
+  --now-playing: 0px;
   --keyboard: 0px;
   --font-ui: "Apple SD Gothic Neo", "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-en: "Iowan Old Style", Palatino, "Palatino Linotype", Georgia, "Times New Roman", serif;
@@ -132,7 +133,7 @@ button {
 }
 
 .content {
-  padding: 8px 18px calc(var(--nav) + env(safe-area-inset-bottom) + var(--keyboard, 0px) + 36px);
+  padding: 8px 18px calc(var(--nav) + env(safe-area-inset-bottom) + var(--keyboard, 0px) + var(--now-playing, 0px) + 36px);
   max-width: 100%;
   overflow-x: hidden;
 }
@@ -1295,6 +1296,93 @@ html.listen-wide .pen-bar {
 
 .bottom-nav[hidden] {
   display: none !important;
+}
+
+html.has-now-playing {
+  --now-playing: 78px;
+}
+
+#now-playing {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--nav) + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  width: min(760px, 100%);
+  z-index: 29;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: #2f473e;
+  color: #f7f4ee;
+  box-shadow: 0 -10px 24px rgba(44, 42, 38, 0.16);
+}
+
+#now-playing[hidden] {
+  display: none !important;
+}
+
+.now-playing-toggle {
+  min-width: 48px;
+  min-height: 48px;
+  flex: 0 0 auto;
+}
+
+.now-playing-main {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.now-playing-title,
+.now-playing-sub {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.now-playing-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.now-playing-sub {
+  margin-top: 2px;
+  font-size: 13px;
+  opacity: 0.86;
+}
+
+.now-playing-go,
+.now-playing-stop {
+  min-height: 48px;
+  padding: 8px 12px;
+  flex: 0 0 auto;
+}
+
+.now-playing-go {
+  background: #f7f4ee;
+  color: #2f473e;
+  border-color: #f7f4ee;
+}
+
+.now-playing-stop {
+  color: #f7f4ee;
+  border-color: rgba(247, 244, 238, 0.35);
+}
+
+html.compare-lock #now-playing {
+  bottom: 0;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom));
+}
+
+html.lesson-wide #now-playing,
+html.listen-wide #now-playing {
+  width: min(1120px, 100%);
 }
 
 html.compare-lock,

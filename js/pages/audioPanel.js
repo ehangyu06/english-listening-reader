@@ -1,7 +1,7 @@
 import { uid, escapeHtml, formatTime, formatBytes, toast } from "../utils.js?v=20260816p";
 import { saveLesson, getFullAudioTrack } from "../storage/lessons.js?v=20260825c";
 import { saveAudio, getAudio, deleteAudio, readAudioDuration, isAudioFile, MAX_AUDIO_BYTES, audioFileInputAttrs } from "../storage/audio.js?v=20260825c";
-import { attachAudio, stopAudio } from "../services/audioPlayer.js?v=20260816p";
+import { attachAudio, stopAudio, getAudioElement, isLessonPlaying, setNowPlaying } from "../services/audioPlayer.js?v=20260826d";
 
 const SPEEDS = [0.8, 0.9, 1.0, 1.1, 1.2];
 // TODO: add a 10-second A-B loop control on top of HTMLAudioElement.
@@ -210,44 +210,63 @@ export async function bindAudioPanel(root, lesson) {
     }
   };
 
+  const markPlaying = (track) => {
+    setNowPlaying({
+      kind: "lesson",
+      lessonId: lesson.id,
+      href: `#/lesson/${encodeURIComponent(lesson.id)}`,
+      title: lesson.bookTitle || "학습 페이지",
+      subtitle: [lesson.chapter, lesson.page ? `Page ${lesson.page}` : ""].filter(Boolean).join(" · "),
+      fileName: track.fileName || "",
+    });
+  };
+
   const showPlayer = async (track) => {
-    stopAudio();
-    const record = await getAudio(track.audioId);
-    if (!record?.blob) {
-      mount.innerHTML = missingAudioMarkup(track);
-      mount.querySelector("#audio-retry")?.addEventListener("click", async () => {
-        toast("클라우드에서 다시 찾습니다.");
-        await showPlayer(track);
-      });
-      const input = mount.querySelector("#audio-file");
-      input?.addEventListener("change", () => {
-        const file = input.files?.[0];
-        if (!file) return;
-        if (!confirm("기존 오디오 파일을 새 파일로 교체하시겠습니까?")) {
+    const reuse = isLessonPlaying(lesson.id);
+    const existing = reuse ? getAudioElement() : null;
+    if (!existing) {
+      const record = await getAudio(track.audioId);
+      if (!record?.blob) {
+        mount.innerHTML = missingAudioMarkup(track);
+        mount.querySelector("#audio-retry")?.addEventListener("click", async () => {
+          toast("클라우드에서 다시 찾습니다.");
+          await showPlayer(track);
+        });
+        const input = mount.querySelector("#audio-file");
+        input?.addEventListener("change", () => {
+          const file = input.files?.[0];
+          if (!file) return;
+          if (!confirm("기존 오디오 파일을 새 파일로 교체하시겠습니까?")) {
+            input.value = "";
+            return;
+          }
+          chooseFile(file, { replacing: true });
           input.value = "";
-          return;
-        }
-        chooseFile(file, { replacing: true });
-        input.value = "";
-      });
-      mount.querySelector("#audio-delete")?.addEventListener("click", async () => {
-        if (!confirm("이 페이지의 오디오만 삭제할까요? Script와 학습 내용은 그대로 둡니다.")) return;
-        const current = getFullAudioTrack(lesson);
-        stopAudio();
-        if (current?.audioId) await deleteAudio(current.audioId);
-        lesson.audioTracks = (lesson.audioTracks || []).filter((item) => item.type !== "full");
-        lesson.updatedAt = new Date().toISOString();
-        await saveLesson(lesson);
-        toast("오디오를 삭제했습니다.");
-        renderEmpty();
-      });
+        });
+        mount.querySelector("#audio-delete")?.addEventListener("click", async () => {
+          if (!confirm("이 페이지의 오디오만 삭제할까요? Script와 학습 내용은 그대로 둡니다.")) return;
+          const current = getFullAudioTrack(lesson);
+          stopAudio();
+          if (current?.audioId) await deleteAudio(current.audioId);
+          lesson.audioTracks = (lesson.audioTracks || []).filter((item) => item.type !== "full");
+          lesson.updatedAt = new Date().toISOString();
+          await saveLesson(lesson);
+          toast("오디오를 삭제했습니다.");
+          renderEmpty();
+        });
+        return;
+      }
+      loopOn = false;
+      const audio = attachAudio(record.blob);
+      audio.playbackRate = 1;
+      audio.loop = false;
+      mount.innerHTML = playerMarkup(track);
+      bindPlayer(audio, track);
       return;
     }
+    loopOn = Boolean(existing.loop);
     mount.innerHTML = playerMarkup(track);
-    const audio = attachAudio(record.blob);
-    audio.playbackRate = 1;
-    audio.loop = loopOn;
-    bindPlayer(audio, track);
+    bindPlayer(existing, track);
   };
 
   const bindPlayer = (audio, track) => {
@@ -268,15 +287,17 @@ export async function bindAudioPanel(root, lesson) {
       loopBtn.classList.toggle("is-active", loopOn);
     };
 
-    audio.addEventListener("timeupdate", paint);
-    audio.addEventListener("loadedmetadata", paint);
-    audio.addEventListener("play", paint);
-    audio.addEventListener("pause", paint);
-    audio.addEventListener("ended", paint);
+    audio.ontimeupdate = paint;
+    audio.onloadedmetadata = paint;
+    audio.onplay = paint;
+    audio.onpause = paint;
+    audio.onended = paint;
 
     playBtn.addEventListener("click", () => {
-      if (audio.paused) audio.play().catch(() => toast("재생을 시작하지 못했습니다."));
-      else audio.pause();
+      if (audio.paused) {
+        markPlaying(track);
+        audio.play().catch(() => toast("재생을 시작하지 못했습니다."));
+      } else audio.pause();
     });
     mount.querySelector("#audio-back")?.addEventListener("click", () => {
       audio.currentTime = Math.max(0, audio.currentTime - 5);
@@ -286,6 +307,7 @@ export async function bindAudioPanel(root, lesson) {
       audio.currentTime = Math.min(duration, audio.currentTime + 5);
     });
     mount.querySelector("#audio-restart")?.addEventListener("click", () => {
+      markPlaying(track);
       audio.currentTime = 0;
       audio.play().catch(() => toast("재생을 시작하지 못했습니다."));
     });

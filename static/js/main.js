@@ -2,10 +2,11 @@ import { initDb } from "./storage/db.js?v=20260825c";
 import { syncLibrary } from "./storage/sync.js?v=20260826c";
 import { removeSampleLesson } from "./data/sample.js?v=20260825c";
 import { parseRoute, startRouter } from "./router.js?v=20260818k";
-import { renderApp } from "./app.js?v=20260826c";
+import { renderApp } from "./app.js?v=20260826d";
 import { bindLightboxHistory } from "./pages/lightbox.js?v=20260816w";
 import { bindDeleteClicks } from "./pages/deletes.js?v=20260825c";
 import { bindTitleEdit } from "./pages/titleEdit.js?v=20260825c";
+import { bindNowPlaying } from "./ui/nowPlaying.js?v=20260826d";
 import { go } from "./utils.js?v=20260816p";
 
 function watchKeyboard() {
@@ -33,6 +34,7 @@ async function boot() {
   await removeSampleLesson();
 
   const app = document.getElementById("app");
+  bindNowPlaying();
   bindDeleteClicks(app, renderApp);
   bindTitleEdit(app, renderApp);
   app.addEventListener("click", (event) => {

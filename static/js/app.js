@@ -1,18 +1,19 @@
-import { stopAudio } from "./services/audioPlayer.js?v=20260818a";
+import { stopAudio, getNowPlaying } from "./services/audioPlayer.js?v=20260826d";
 import { closeLightbox, isLightboxOpen } from "./pages/lightbox.js?v=20260816w";
 import { renderHome } from "./pages/home.js?v=20260826c";
 import { renderBooks, renderBookDetail } from "./pages/books.js?v=20260826c";
-import { renderLesson } from "./pages/lesson.js?v=20260826c";
+import { renderLesson } from "./pages/lesson.js?v=20260826d";
 import { renderCompare } from "./pages/compare.js?v=20260825c";
 import { renderAdd } from "./pages/add.js?v=20260825c";
 import { renderReview } from "./pages/review.js?v=20260825c";
 import { renderSearch } from "./pages/search.js?v=20260825c";
-import { isListenPlaying, renderListen, stopListenSession } from "./pages/listen.js?v=20260825c";
+import { isListenPlaying, renderListen, stopListenSession } from "./pages/listen.js?v=20260826d";
+import { refreshNowPlaying } from "./ui/nowPlaying.js?v=20260826d";
 import { go, toast, escapeHtml } from "./utils.js?v=20260816p";
 
 export async function renderApp(route) {
   stopListenSession();
-  stopAudio();
+  if (getNowPlaying()?.kind !== "lesson") stopAudio();
   closeLightbox();
   if (history.state?.lightbox) {
     history.replaceState(null, "", location.href);
@@ -112,6 +113,7 @@ export async function renderApp(route) {
     console.error(error);
     content.innerHTML = `<div class="empty">화면을 불러오지 못했습니다.</div>`;
   }
+  refreshNowPlaying();
 }
 
 function backButton() {
