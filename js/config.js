@@ -30,7 +30,26 @@ function readSavedCloud() {
   return null;
 }
 
+function readHashCloud() {
+  if (typeof window === "undefined") return null;
+  const hash = String(window.location.hash || "").replace(/^#/, "");
+  if (!hash.startsWith("c=")) return null;
+  try {
+    const json = JSON.parse(atob(decodeURIComponent(hash.slice(2))));
+    if (json?.supabaseUrl && json?.supabaseAnonKey) {
+      saveCloudConfig(json);
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      return json;
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
 export function getCloudConfig() {
+  const fromHash = readHashCloud();
+  if (fromHash) return fromHash;
   const injected = typeof window !== "undefined" ? window.__LISTENING_CLOUD__ : null;
   if (injected?.supabaseUrl && injected?.supabaseAnonKey) return injected;
   const saved = readSavedCloud();

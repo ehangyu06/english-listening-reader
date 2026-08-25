@@ -9,7 +9,7 @@ import {
   cloudPutLesson,
   cloudPutSetting,
   isCloudEnabled,
-} from "./cloud.js?v=20260825c";
+} from "./cloud.js?v=20260826a";
 
 function useMacRemote() {
   const host = location.hostname || "";

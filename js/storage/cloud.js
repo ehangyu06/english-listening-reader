@@ -4,7 +4,7 @@ import {
   LESSON_TABLE,
   SETTING_TABLE,
   getCloudConfig,
-} from "../config.js?v=20260825c";
+} from "../config.js?v=20260826a";
 
 export function isCloudEnabled() {
   const cloud = getCloudConfig();

@@ -1,9 +1,9 @@
 """Workplace entry for Listening Reader (Streamlit Cloud)."""
 
+import base64
 import json
 
 import streamlit as st
-import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Listening Reader", layout="wide")
 
@@ -35,38 +35,13 @@ cloud = {
     "supabaseUrl": secret_get("supabase", "url"),
     "supabaseAnonKey": secret_get("supabase", "anon_key"),
 }
-payload = json.dumps(cloud, ensure_ascii=False)
+target = "/app/static/index.html"
+if cloud["supabaseUrl"] and cloud["supabaseAnonKey"]:
+    packed = base64.b64encode(json.dumps(cloud).encode("utf-8")).decode("ascii")
+    target += "#c=" + packed
 
-st.caption("Listening Reader를 여는 중입니다.")
-st.markdown("[앱이 안 열리면 여기를 누르세요](/app/static/index.html)")
-
-components.html(
-    f"""
-<!DOCTYPE html>
-<html lang="ko">
-  <head>
-    <meta charset="UTF-8" />
-    <script>
-      (function () {{
-        var cloud = {payload};
-        var target = "/app/static/index.html";
-        try {{
-          if (cloud.supabaseUrl && cloud.supabaseAnonKey) {{
-            window.top.localStorage.setItem("listening-cloud", JSON.stringify(cloud));
-          }}
-        }} catch (error) {{}}
-        try {{
-          window.top.location.replace(target);
-        }} catch (error) {{
-          window.location.replace(target);
-        }}
-      }})();
-    </script>
-  </head>
-  <body>
-    <p><a href="/app/static/index.html" target="_top">Listening Reader 열기</a></p>
-  </body>
-</html>
-""",
-    height=80,
-)
+st.title("Listening Reader")
+st.success("입장했습니다. 아래 버튼을 직접 눌러 앱을 여세요.")
+st.caption("아이패드 사파리에서는 자동으로 넘어가지 않습니다. 버튼을 눌러야 합니다.")
+st.link_button("Listening Reader 열기", target, type="primary")
+st.markdown(f"[같은 창에서 열기]({target})")
