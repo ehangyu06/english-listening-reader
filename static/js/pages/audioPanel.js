@@ -38,6 +38,26 @@ function previewMarkup(file, duration) {
   `;
 }
 
+function missingAudioMarkup(track) {
+  return `
+    <div class="player audio-missing">
+      <div class="player-kicker">🎧 Listening</div>
+      <p class="audio-file-name">${escapeHtml(track.fileName || "audio")}</p>
+      <p class="hint">이 페이지에 저장해 둔 음성입니다. 클라우드에 아직 파일이 없어서 아이패드에서 재생할 수 없습니다. 집 맥에서 앱을 한 번 열어 음성을 올린 뒤, 다시 불러오세요.</p>
+      <div class="player-btns">
+        <button type="button" class="btn btn-play" id="audio-retry">다시 불러오기</button>
+      </div>
+      <div class="form-actions">
+        <label class="file-btn text-btn" id="audio-replace-label">
+          오디오 교체
+          <input id="audio-file" class="file-overlay" type="file"${audioFileInputAttrs()}>
+        </label>
+        <button type="button" class="text-btn danger" id="audio-delete">오디오 삭제</button>
+      </div>
+    </div>
+  `;
+}
+
 function playerMarkup(track) {
   const speeds = SPEEDS.map((speed) => {
     const active = speed === 1 ? "is-active" : "";
@@ -194,8 +214,33 @@ export async function bindAudioPanel(root, lesson) {
     stopAudio();
     const record = await getAudio(track.audioId);
     if (!record?.blob) {
-      toast("저장된 오디오를 찾지 못했습니다.");
-      renderEmpty();
+      mount.innerHTML = missingAudioMarkup(track);
+      mount.querySelector("#audio-retry")?.addEventListener("click", async () => {
+        toast("클라우드에서 다시 찾습니다.");
+        await showPlayer(track);
+      });
+      const input = mount.querySelector("#audio-file");
+      input?.addEventListener("change", () => {
+        const file = input.files?.[0];
+        if (!file) return;
+        if (!confirm("기존 오디오 파일을 새 파일로 교체하시겠습니까?")) {
+          input.value = "";
+          return;
+        }
+        chooseFile(file, { replacing: true });
+        input.value = "";
+      });
+      mount.querySelector("#audio-delete")?.addEventListener("click", async () => {
+        if (!confirm("이 페이지의 오디오만 삭제할까요? Script와 학습 내용은 그대로 둡니다.")) return;
+        const current = getFullAudioTrack(lesson);
+        stopAudio();
+        if (current?.audioId) await deleteAudio(current.audioId);
+        lesson.audioTracks = (lesson.audioTracks || []).filter((item) => item.type !== "full");
+        lesson.updatedAt = new Date().toISOString();
+        await saveLesson(lesson);
+        toast("오디오를 삭제했습니다.");
+        renderEmpty();
+      });
       return;
     }
     mount.innerHTML = playerMarkup(track);

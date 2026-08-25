@@ -9,6 +9,7 @@ import socketserver
 from pathlib import Path
 from urllib.parse import unquote
 
+import cloud_push
 import store
 
 ROOT = Path(__file__).resolve().parent
@@ -105,6 +106,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if path == "/api/state":
             self._send_json(200, store.get_state())
             return
+        if path == "/api/cloud-push":
+            self._send_json(200, cloud_push.get_status())
+            return
         if len(parts) == 4 and parts[0] == "api" and parts[1] in ("images", "audio") and parts[3] == "exists":
             self._send_json(200, {"exists": store.blob_exists(parts[1], parts[2])})
             return
@@ -146,6 +150,17 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 )
                 self._send_json(200, {"ok": True})
                 return
+            if path == "/api/cloud-config":
+                payload = json.loads(self._read_body().decode("utf-8") or "{}")
+                status = cloud_push.save_cloud_config(
+                    payload.get("supabaseUrl"),
+                    payload.get("supabaseAnonKey"),
+                )
+                self._send_json(200, {"ok": True, "push": status})
+                return
+            if path == "/api/cloud-push":
+                self._send_json(200, cloud_push.start_push())
+                return
         except (ValueError, json.JSONDecodeError) as error:
             self._send_json(400, {"error": str(error)})
             return
@@ -177,6 +192,8 @@ class IPv4Server(socketserver.ThreadingTCPServer):
 def main():
     ip = lan_ip()
     bonjour = bonjour_host()
+    store.ensure_dirs()
+    cloud_push.start_push_if_configured()
     with IPv4Server(("0.0.0.0", PORT), Handler) as httpd:
         print("English Listening Reader", flush=True)
         print(flush=True)

@@ -5,9 +5,11 @@ import {
   remoteGetState,
   remotePutLesson,
   remotePutSetting,
-  remoteBlobExists,
-  remotePutBlob,
-} from "./remote.js?v=20260825c";
+  remoteGetBlob,
+  persistCloudToMac,
+  ensureRemoteBlob,
+  useMacRemote,
+} from "./remote.js?v=20260826c";
 
 function newer(a, b) {
   return String(a?.updatedAt || "") >= String(b?.updatedAt || "");
@@ -15,13 +17,28 @@ function newer(a, b) {
 
 async function syncBlob(kind, id) {
   if (!id) return;
-  const local = await runStore(kind, "readonly", (store) => store.get(id));
+  let local = await runStore(kind, "readonly", (store) => store.get(id));
+  if (!local?.blob && useMacRemote()) {
+    try {
+      local = await remoteGetBlob(kind, id);
+      if (local?.blob) {
+        await runStore(kind, "readwrite", (store) => store.put(local));
+      }
+    } catch (error) {
+      console.warn(error);
+    }
+  }
   if (!local?.blob) return;
-  const exists = await remoteBlobExists(kind, id);
-  if (!exists) await remotePutBlob(kind, local);
+  await ensureRemoteBlob(kind, local);
 }
 
 export async function syncLibrary() {
+  try {
+    await persistCloudToMac();
+  } catch (error) {
+    console.warn(error);
+  }
+
   let remote;
   try {
     remote = await remoteGetState();

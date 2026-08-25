@@ -38,6 +38,16 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+.boot-msg {
+  margin: 48px 24px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.audio-missing .hint {
+  margin: 8px 0 14px;
+}
+
 button,
 a,
 label,

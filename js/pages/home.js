@@ -1,6 +1,6 @@
 import { getAllLessons, hasAudio } from "../storage/lessons.js?v=20260825c";
 import { getSetting } from "../storage/db.js?v=20260825c";
-import { remoteStatus } from "../storage/remote.js?v=20260826a";
+import { remoteStatus, persistCloudToMac, macCloudPushStatus } from "../storage/remote.js?v=20260826c";
 import { isCloudEnabled } from "../storage/cloud.js?v=20260826a";
 import { clearCloudConfig, getCloudConfig, saveCloudConfig } from "../config.js?v=20260826a";
 import { scriptPreviewLines } from "../services/parser.js?v=20260816p";
@@ -78,6 +78,11 @@ function bindCloudForm(mount) {
       return;
     }
     saveCloudConfig({ supabaseUrl, supabaseAnonKey });
+    try {
+      await persistCloudToMac();
+    } catch (error) {
+      console.warn(error);
+    }
     toast("클라우드 정보를 저장했습니다. 연결을 확인합니다.");
     location.reload();
   });
@@ -93,14 +98,17 @@ async function renderCloudStatus(mount) {
   const status = await remoteStatus();
   const config = getCloudConfig();
   if (status.cloud) {
+    const push = await macCloudPushStatus();
     mount.innerHTML = `
       <section class="card cloud-card is-ok">
         <div class="block-title">클라우드 연결됨</div>
         <p class="hint">집과 직장에서 같은 학습자료를 봅니다. 맥이 꺼져 있어도 브라우저만 있으면 됩니다.</p>
+        ${pushHintMarkup(push)}
         <button type="button" class="text-btn" id="cloud-disconnect">이 기기 연결 해제</button>
       </section>
     `;
     bindCloudForm(mount);
+    if (push?.running) watchCloudPush(mount);
     return;
   }
   if (status.mac) {
@@ -110,7 +118,7 @@ async function renderCloudStatus(mount) {
         <p class="hint">${
           isCloudEnabled()
             ? "집 맥과 아이패드는 지금처럼 사용할 수 있습니다. URL과 anon 키를 다시 확인하거나, SQL을 실행했는지 봐 주세요."
-            : "지금은 이 맥에만 저장됩니다. 직장에서 보려면 아래 칸에 Supabase 값을 넣으세요."
+            : "지금은 이 맥에만 저장됩니다. 아이패드에서 글은 보이는데 음성이 없다면, 여기 맥에서 클라우드를 한 번 연결해 주세요. 맥에 있는 음성이 올라갑니다."
         }</p>
         <p class="hint">supabase.com → 영어 회화 프로젝트 → SQL Editor에 <code>supabase/setup.sql</code> 실행 후, Settings → API의 Project URL과 anon public 키를 붙여넣으세요.</p>
         ${cloudFormMarkup(config)}
@@ -139,6 +147,43 @@ async function renderCloudStatus(mount) {
     </section>
   `;
   bindCloudForm(mount);
+}
+
+function pushHintMarkup(push) {
+  if (!push) return "";
+  if (push.running) {
+    const total = Number(push.total || 0);
+    const done = Number(push.done || 0);
+    const label = total ? `${done}/${total}` : "준비 중";
+    return `<p class="hint" data-push-hint>맥에 있던 음성·사진을 클라우드로 올리는 중입니다. (${escapeHtml(String(label))})</p>`;
+  }
+  if (push.complete && Number(push.done || 0) > 0) {
+    const failed = Number(push.failed || 0);
+    return `<p class="hint" data-push-hint>음성 ${escapeHtml(String(push.done))}개를 클라우드에 올렸습니다.${
+      failed ? ` 실패 ${escapeHtml(String(failed))}개.` : ""
+    } 아이패드에서 페이지를 새로고침하면 재생됩니다.</p>`;
+  }
+  if (push.complete && push.error) {
+    return `<p class="hint" data-push-hint>음성을 클라우드에 올리지 못했습니다. URL과 anon 키를 다시 연결해 주세요.</p>`;
+  }
+  if (push.complete && Number(push.skipped || 0) > 0) {
+    return `<p class="hint" data-push-hint>맥에 있는 음성은 이미 클라우드에 있습니다. 아이패드에서 페이지를 새로고침해 보세요.</p>`;
+  }
+  return "";
+}
+
+function watchCloudPush(mount) {
+  window.setTimeout(async () => {
+    if (!mount.isConnected) return;
+    const push = await macCloudPushStatus();
+    const card = mount.querySelector(".cloud-card");
+    if (!card || !push) return;
+    const extra = card.querySelector("[data-push-hint]");
+    const html = pushHintMarkup(push);
+    if (extra) extra.outerHTML = html || "";
+    else if (html) card.insertAdjacentHTML("beforeend", html);
+    if (push.running) watchCloudPush(mount);
+  }, 2000);
 }
 
 async function renderIpadGuide(mount) {

@@ -44,6 +44,10 @@ body {
   color: var(--muted);
 }
 
+.audio-missing .hint {
+  margin: 8px 0 14px;
+}
+
 button,
 a,
 label,

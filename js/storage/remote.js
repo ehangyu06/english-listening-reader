@@ -1,3 +1,4 @@
+import { getCloudConfig } from "../config.js?v=20260826a";
 import {
   cloudBlobExists,
   cloudDeleteBlob,
@@ -11,7 +12,7 @@ import {
   isCloudEnabled,
 } from "./cloud.js?v=20260826a";
 
-function useMacRemote() {
+export function useMacRemote() {
   const host = location.hostname || "";
   if (host === "127.0.0.1" || host === "localhost") return true;
   if (host.endsWith(".local")) return true;
@@ -144,19 +145,70 @@ export async function remotePutSetting(key, value) {
   }
 }
 
+async function macBlobExists(kind, id) {
+  if (!id || !useMacRemote()) return false;
+  try {
+    const res = await macRequest("/api/" + kind + "/" + encodeURIComponent(id) + "/exists");
+    const data = await res.json();
+    return Boolean(data.exists);
+  } catch {
+    return false;
+  }
+}
+
 export async function remoteBlobExists(kind, id) {
   if (!id) return false;
-  if (useMacRemote()) {
-    try {
-      const res = await macRequest("/api/" + kind + "/" + encodeURIComponent(id) + "/exists");
-      const data = await res.json();
-      if (data.exists) return true;
-    } catch {
-      // fall through to cloud
-    }
-  }
+  if (await macBlobExists(kind, id)) return true;
   if (isCloudEnabled()) return cloudBlobExists(kind, id);
   return false;
+}
+
+export async function persistCloudToMac() {
+  if (!useMacRemote() || !isCloudEnabled()) return null;
+  const cloud = getCloudConfig();
+  const res = await macRequest("/api/cloud-config", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      supabaseUrl: cloud.supabaseUrl,
+      supabaseAnonKey: cloud.supabaseAnonKey,
+    }),
+  });
+  return res.json();
+}
+
+export async function macCloudPushStatus() {
+  if (!useMacRemote()) return null;
+  try {
+    const res = await macRequest("/api/cloud-push");
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function ensureRemoteBlob(kind, record) {
+  if (!record?.id || !record.blob) return;
+  const tasks = [];
+  if (useMacRemote() && !(await macBlobExists(kind, record.id))) {
+    tasks.push(
+      macRequest("/api/" + kind + "/" + encodeURIComponent(record.id), {
+        method: "PUT",
+        headers: {
+          "Content-Type": record.mimeType || record.blob.type || "application/octet-stream",
+          "X-File-Name": encodeURIComponent(record.fileName || ""),
+        },
+        body: record.blob,
+      })
+    );
+  }
+  if (isCloudEnabled() && !(await cloudBlobExists(kind, record.id))) {
+    tasks.push(cloudPutBlob(kind, record));
+  }
+  const results = await Promise.allSettled(tasks);
+  for (const result of results) {
+    if (result.status === "rejected") console.warn(result.reason);
+  }
 }
 
 export async function remoteGetBlob(kind, id) {
