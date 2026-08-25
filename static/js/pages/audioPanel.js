@@ -1,7 +1,7 @@
 import { uid, escapeHtml, formatTime, formatBytes, toast } from "../utils.js?v=20260816p";
 import { saveLesson, getFullAudioTrack } from "../storage/lessons.js?v=20260825c";
 import { saveAudio, getAudio, deleteAudio, readAudioDuration, isAudioFile, MAX_AUDIO_BYTES, audioFileInputAttrs } from "../storage/audio.js?v=20260825c";
-import { attachAudio, stopAudio, getAudioElement, isLessonPlaying, setNowPlaying } from "../services/audioPlayer.js?v=20260826d";
+import { attachAudio, stopAudio, getAudioElement, isLessonPlaying, setNowPlaying } from "../services/audioPlayer.js?v=20260826e";
 
 const SPEEDS = [0.8, 0.9, 1.0, 1.1, 1.2];
 // TODO: add a 10-second A-B loop control on top of HTMLAudioElement.

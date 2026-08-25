@@ -102,6 +102,13 @@ export function toggleAudio() {
   else audioEl.pause();
 }
 
+export function skipAudio(seconds) {
+  if (!audioEl) return;
+  const duration = Number.isFinite(audioEl.duration) ? audioEl.duration : 0;
+  const next = (audioEl.currentTime || 0) + Number(seconds || 0);
+  audioEl.currentTime = Math.min(duration > 0 ? duration : Math.max(0, next), Math.max(0, next));
+}
+
 function notify() {
   for (const fn of listeners) {
     try {
@@ -138,6 +145,8 @@ function syncMediaSession() {
     navigator.mediaSession.setActionHandler("play", () => toggleAudio());
     navigator.mediaSession.setActionHandler("pause", () => audioEl?.pause());
     navigator.mediaSession.setActionHandler("stop", () => stopAudio());
+    navigator.mediaSession.setActionHandler("seekbackward", () => skipAudio(-5));
+    navigator.mediaSession.setActionHandler("seekforward", () => skipAudio(5));
   } catch {
     /* ignore */
   }

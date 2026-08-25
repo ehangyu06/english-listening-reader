@@ -3,9 +3,10 @@ import {
   getAudioElement,
   getNowPlaying,
   onNowPlayingChange,
+  skipAudio,
   stopAudio,
   toggleAudio,
-} from "../services/audioPlayer.js?v=20260826d";
+} from "../services/audioPlayer.js?v=20260826e";
 import { escapeHtml, go } from "../utils.js?v=20260816p";
 
 export function bindNowPlaying() {
@@ -48,9 +49,13 @@ function renderNowPlaying(mount) {
   const paused = audio.paused;
   mount.hidden = false;
   mount.innerHTML = `
-    <button type="button" class="btn btn-play btn-play-round now-playing-toggle" id="now-playing-toggle" aria-label="${
-      paused ? "재생" : "일시정지"
-    }">${paused ? "▶" : "⏸"}</button>
+    <div class="now-playing-transport">
+      <button type="button" class="btn btn-ghost now-playing-skip" id="now-playing-back" aria-label="5초 뒤로">-5초</button>
+      <button type="button" class="btn btn-play btn-play-round now-playing-toggle" id="now-playing-toggle" aria-label="${
+        paused ? "재생" : "일시정지"
+      }">${paused ? "▶" : "⏸"}</button>
+      <button type="button" class="btn btn-ghost now-playing-skip" id="now-playing-fwd" aria-label="5초 앞으로">+5초</button>
+    </div>
     <button type="button" class="now-playing-main" id="now-playing-open">
       <span class="now-playing-title">${escapeHtml(info.title || "학습 페이지")}</span>
       <span class="now-playing-sub">${escapeHtml(info.subtitle || info.fileName || "재생 중")}</span>
@@ -59,6 +64,14 @@ function renderNowPlaying(mount) {
     <button type="button" class="btn btn-ghost now-playing-stop" id="now-playing-stop">중단</button>
   `;
 
+  mount.querySelector("#now-playing-back")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    skipAudio(-5);
+  });
+  mount.querySelector("#now-playing-fwd")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    skipAudio(5);
+  });
   mount.querySelector("#now-playing-toggle")?.addEventListener("click", (event) => {
     event.preventDefault();
     toggleAudio();

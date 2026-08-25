@@ -1,7 +1,7 @@
 import { getAllLessons, getLessonsByBook, groupBooks, hasAudio, getFullAudioTrack } from "../storage/lessons.js?v=20260825c";
 import { getStoredBookTitles } from "../storage/books.js?v=20260816w";
 import { getAudio } from "../storage/audio.js?v=20260825c";
-import { getAudioElement, stopAudio, swapAudio } from "../services/audioPlayer.js?v=20260826d";
+import { getAudioElement, stopAudio, swapAudio } from "../services/audioPlayer.js?v=20260826e";
 import { escapeHtml, formatTime, naturalCompare, nl2br, toast } from "../utils.js?v=20260816p";
 
 const SPEEDS = [0.8, 0.9, 1.0, 1.1, 1.2];
