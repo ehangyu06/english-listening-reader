@@ -1,14 +1,11 @@
 import { SAMPLE_ID } from "../data/sample.js?v=20260816w";
 import { runStore, getSetting, setSetting } from "./db.js?v=20260825c";
 import { getAllLessons, saveLesson, normalizeLesson } from "./lessons.js?v=20260825c";
-import { getImage, saveImage } from "./images.js?v=20260825c";
-import { getAudio, saveAudio } from "./audio.js?v=20260825c";
 import {
   remoteGetState,
   remotePutLesson,
   remotePutSetting,
   remoteBlobExists,
-  remoteGetBlob,
   remotePutBlob,
 } from "./remote.js?v=20260825c";
 
@@ -18,18 +15,10 @@ function newer(a, b) {
 
 async function syncBlob(kind, id) {
   if (!id) return;
-  const local = kind === "images" ? await getImage(id) : await getAudio(id);
+  const local = await runStore(kind, "readonly", (store) => store.get(id));
+  if (!local?.blob) return;
   const exists = await remoteBlobExists(kind, id);
-  if (local?.blob && !exists) {
-    await remotePutBlob(kind, local);
-    return;
-  }
-  if (!local && exists) {
-    const remote = await remoteGetBlob(kind, id);
-    if (!remote) return;
-    if (kind === "images") await saveImage(remote);
-    else await saveAudio(remote);
-  }
+  if (!exists) await remotePutBlob(kind, local);
 }
 
 export async function syncLibrary() {

@@ -1,7 +1,7 @@
 import { initDb } from "./storage/db.js?v=20260825c";
-import { syncLibrary } from "./storage/sync.js?v=20260825c";
+import { syncLibrary } from "./storage/sync.js?v=20260826b";
 import { removeSampleLesson } from "./data/sample.js?v=20260825c";
-import { startRouter } from "./router.js?v=20260818k";
+import { parseRoute, startRouter } from "./router.js?v=20260818k";
 import { renderApp } from "./app.js?v=20260826a";
 import { bindLightboxHistory } from "./pages/lightbox.js?v=20260816w";
 import { bindDeleteClicks } from "./pages/deletes.js?v=20260825c";
@@ -31,7 +31,6 @@ async function boot() {
   bindLightboxHistory();
   await initDb();
   await removeSampleLesson();
-  await syncLibrary();
 
   const app = document.getElementById("app");
   bindDeleteClicks(app, renderApp);
@@ -45,6 +44,12 @@ async function boot() {
   });
 
   startRouter(renderApp);
+  try {
+    await syncLibrary();
+    await renderApp(parseRoute());
+  } catch (error) {
+    console.warn(error);
+  }
 }
 
 boot().catch((error) => {
