@@ -2,8 +2,36 @@
 
 import base64
 import json
+import shutil
+from pathlib import Path
 
 import streamlit as st
+
+ROOT = Path(__file__).resolve().parent
+STATIC_DIR = ROOT / "static"
+
+
+def sync_static_files():
+    """Copy the web app into static/. Streamlit Cloud does not follow git symlinks."""
+    STATIC_DIR.mkdir(exist_ok=True)
+    for name in ("index.html", "js", "css"):
+        src = ROOT / name
+        dest = STATIC_DIR / name
+        if dest.is_symlink() or dest.is_file():
+            dest.unlink()
+        elif dest.is_dir():
+            shutil.rmtree(dest)
+        if src.is_dir():
+            shutil.copytree(src, dest, ignore=shutil.ignore_patterns(".DS_Store", "__pycache__"))
+        else:
+            shutil.copy2(src, dest)
+    listening = STATIC_DIR / "listening.html"
+    if listening.exists() or listening.is_symlink():
+        listening.unlink()
+    shutil.copy2(STATIC_DIR / "index.html", listening)
+
+
+sync_static_files()
 
 st.set_page_config(page_title="Listening Reader", layout="wide")
 
@@ -35,7 +63,7 @@ cloud = {
     "supabaseUrl": secret_get("supabase", "url"),
     "supabaseAnonKey": secret_get("supabase", "anon_key"),
 }
-target = "/app/static/index.html"
+target = "/app/static/listening.html"
 if cloud["supabaseUrl"] and cloud["supabaseAnonKey"]:
     packed = base64.b64encode(json.dumps(cloud).encode("utf-8")).decode("ascii")
     target += "#c=" + packed
