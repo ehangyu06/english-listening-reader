@@ -91,6 +91,7 @@ export function swapAudio(blob) {
   }
   objectUrl = URL.createObjectURL(blob);
   audioEl.src = objectUrl;
+  audioEl._keepAliveOnEnded = false;
   audioEl.load();
   notify();
   return audioEl;
@@ -125,7 +126,7 @@ function wireAudio(el) {
   el.addEventListener("play", notify);
   el.addEventListener("pause", notify);
   el.addEventListener("ended", () => {
-    if (el.loop) return;
+    if (el.loop || el._keepAliveOnEnded) return;
     stopAudio();
   });
 }

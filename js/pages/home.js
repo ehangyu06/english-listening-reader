@@ -6,6 +6,8 @@ import { clearCloudConfig, getCloudConfig, saveCloudConfig } from "../config.js?
 import { scriptPreviewLines } from "../services/parser.js?v=20260816p";
 import { escapeHtml, formatDate, toast } from "../utils.js?v=20260816p";
 
+const PAGES_URL = "https://ehangyu06.github.io/english-listening-reader/";
+
 export async function renderHome(el) {
   const lessons = await getAllLessons();
   const currentBook = (await getSetting("currentBook", "")) || lessons[0]?.bookTitle || "";
@@ -188,36 +190,41 @@ function watchCloudPush(mount) {
 
 async function renderIpadGuide(mount) {
   if (!mount) return;
-  const host = location.hostname;
-  const alreadyOnLan = host !== "127.0.0.1" && host !== "localhost";
-  if (alreadyOnLan || sessionStorage.getItem("hideIpadGuide") === "1") return;
+  if (sessionStorage.getItem("hideIpadGuide") === "1") return;
 
-  let url = "";
+  const host = location.hostname;
+  const onPages = host.endsWith("github.io");
+  if (onPages) return;
+
   let lanUrl = "";
+  let bonjourUrl = "";
   try {
     const res = await fetch("/__lan.json", { cache: "no-store" });
     if (res.ok) {
       const data = await res.json();
-      url = data.bonjourUrl || data.url || "";
-      lanUrl = data.url && data.url !== url ? data.url : "";
+      bonjourUrl = data.bonjourUrl || "";
+      lanUrl = data.url || "";
     }
   } catch {
-    url = "";
+    lanUrl = "";
   }
-  if (!url) return;
 
-  const qr = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(url)}`;
+  const qr = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(PAGES_URL)}`;
+  const extra = [bonjourUrl, lanUrl]
+    .filter(Boolean)
+    .map((value) => value.replace(/^https?:\/\//, ""))
+    .join(" · ");
   mount.innerHTML = `
     <section class="card ipad-card">
       <div class="ipad-card-top">
         <div>
-          <div class="block-title">아이패드에서 보기</div>
-          <p class="hint">같은 Wi-Fi에서 아래 주소를 북마크하세요. IP가 바뀌어도 이 주소는 그대로입니다. 맥이 켜져 있으면 서버가 자동으로 켜집니다.</p>
+          <div class="block-title">아이패드·휴대폰에서 보기</div>
+          <p class="hint">맥을 꺼도 되는 주소입니다. 사파리에 넣고 홈 화면에 추가하세요.</p>
         </div>
         <button type="button" class="text-btn" id="hide-ipad-guide">안내 닫기</button>
       </div>
-      <div class="ipad-url">${escapeHtml(url.replace(/^https?:\/\//, ""))}</div>
-      ${lanUrl ? `<p class="muted">백업 주소: ${escapeHtml(lanUrl.replace(/^https?:\/\//, ""))}</p>` : ""}
+      <div class="ipad-url">${escapeHtml(PAGES_URL.replace(/^https?:\/\//, ""))}</div>
+      ${extra ? `<p class="muted">맥이 켜져 있고 같은 Wi-Fi일 때만: ${escapeHtml(extra)}</p>` : ""}
       <img class="ipad-qr" src="${qr}" alt="아이패드 접속 QR">
     </section>
   `;

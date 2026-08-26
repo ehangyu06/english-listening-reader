@@ -1,19 +1,32 @@
-import { stopAudio, getNowPlaying } from "./services/audioPlayer.js?v=20260826e";
+import { stopAudio, getNowPlaying } from "./services/audioPlayer.js?v=20260827d";
 import { closeLightbox, isLightboxOpen } from "./pages/lightbox.js?v=20260816w";
-import { renderHome } from "./pages/home.js?v=20260826c";
+import { renderHome } from "./pages/home.js?v=20260827h";
 import { renderBooks, renderBookDetail } from "./pages/books.js?v=20260826c";
-import { renderLesson } from "./pages/lesson.js?v=20260826d";
+import { renderLesson } from "./pages/lesson.js?v=20260827d";
 import { renderCompare } from "./pages/compare.js?v=20260825c";
 import { renderAdd } from "./pages/add.js?v=20260825c";
 import { renderReview } from "./pages/review.js?v=20260825c";
 import { renderSearch } from "./pages/search.js?v=20260825c";
-import { isListenPlaying, renderListen, stopListenSession } from "./pages/listen.js?v=20260826i";
-import { refreshNowPlaying } from "./ui/nowPlaying.js?v=20260826e";
+import { isListenPlaying, renderListen, stopListenSession } from "./pages/listen.js?v=20260827g";
+import { refreshNowPlaying } from "./ui/nowPlaying.js?v=20260827d";
 import { go, toast, escapeHtml } from "./utils.js?v=20260816p";
 
 export async function renderApp(route) {
+  const listenPage = route.name === "listen" || route.name === "listenBook" || route.name === "listenPart";
+  if (isListenPlaying() && listenPage) return;
   stopListenSession();
-  if (getNowPlaying()?.kind !== "lesson") stopAudio();
+  const playing = getNowPlaying();
+  const sameLessonPage =
+    playing?.kind === "lesson" &&
+    (route.name === "lesson" || route.name === "compare") &&
+    route.id === playing.lessonId;
+  if (playing?.kind === "lesson") {
+    if ((route.name === "lesson" || route.name === "compare") && !sameLessonPage) {
+      stopAudio();
+    }
+  } else {
+    stopAudio();
+  }
   closeLightbox();
   if (history.state?.lightbox) {
     history.replaceState(null, "", location.href);
@@ -22,7 +35,6 @@ export async function renderApp(route) {
   const app = document.getElementById("app");
   const actionBar = route.name === "lesson" || route.name === "edit" || route.name === "add";
   const lessonPage = route.name === "lesson";
-  const listenPage = route.name === "listen" || route.name === "listenBook" || route.name === "listenPart";
   const reviewPage = route.name === "review";
   const searchPage = route.name === "search";
   document.documentElement.classList.toggle("lesson-wide", lessonPage);

@@ -6,7 +6,7 @@ import {
   skipAudio,
   stopAudio,
   toggleAudio,
-} from "../services/audioPlayer.js?v=20260826e";
+} from "../services/audioPlayer.js?v=20260827d";
 import { escapeHtml, go } from "../utils.js?v=20260816p";
 
 export function bindNowPlaying() {

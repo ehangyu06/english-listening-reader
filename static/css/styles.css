@@ -2063,6 +2063,35 @@ html.compare-lock #app {
   }
 }
 
+.audio-sheet-handle {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  padding: 12px 12px 10px;
+  border: 0;
+  border-radius: 14px 14px 0 0;
+  background: #efe8dc;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.audio-sheet-pill {
+  width: 56px;
+  height: 6px;
+  border-radius: 999px;
+  background: #5c5850;
+}
+
+.audio-sheet-hint {
+  line-height: 1.2;
+}
+
 .lesson-study-audio .audio-player,
 .lesson-study-audio .audio-preview {
   margin-top: 0;
@@ -2094,16 +2123,24 @@ html.compare-lock #app {
     bottom: calc(var(--nav) + env(safe-area-inset-bottom));
     width: min(760px, 100%);
     z-index: 25;
-    padding: 8px 12px 10px;
+    padding: 0 12px 10px;
     background: rgba(251, 248, 242, 0.96);
     border-top: 1px solid var(--line);
+    border-radius: 18px 18px 0 0;
     box-shadow: 0 -8px 24px rgba(44, 42, 38, 0.08);
     backdrop-filter: blur(16px);
   }
 
+  .lesson-study-audio:has(.audio-player) .audio-sheet-handle {
+    display: flex;
+    margin: 0 -12px 8px;
+    min-height: 52px;
+    border-radius: 18px 18px 0 0;
+  }
+
   .lesson-study-audio:has(.audio-player) .audio-player,
   .lesson-study-audio:has(.audio-preview) .audio-preview {
-    padding: 10px 12px;
+    padding: 4px 12px 10px;
     margin: 0;
   }
 
@@ -2164,6 +2201,73 @@ html.compare-lock #app {
 
   .lesson-study-audio:has(.audio-player) .form-actions {
     margin-top: 2px;
+  }
+
+  .lesson-study:has(.lesson-study-audio.is-collapsed .audio-player) {
+    padding-bottom: 96px;
+  }
+
+  .lesson-study-audio.is-collapsed:has(.audio-player) {
+    padding-bottom: 8px;
+  }
+
+  .lesson-study-audio.is-collapsed:has(.audio-player) .audio-player {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "handle handle handle"
+      "play name time";
+    align-items: center;
+    column-gap: 10px;
+    row-gap: 0;
+    padding: 0 8px 8px;
+  }
+
+  .lesson-study-audio.is-collapsed:has(.audio-player) .audio-sheet-handle {
+    grid-area: handle;
+    margin: 0 -8px;
+    padding-bottom: 2px;
+    min-height: 40px;
+  }
+
+  .lesson-study-audio.is-collapsed:has(.audio-player) .audio-transport {
+    grid-area: play;
+    margin: 0;
+    gap: 0;
+  }
+
+  .lesson-study-audio.is-collapsed:has(.audio-player) .audio-file-name {
+    grid-area: name;
+    margin: 0;
+    font-size: 13px;
+  }
+
+  .lesson-study-audio.is-collapsed:has(.audio-player) .audio-time {
+    grid-area: time;
+    margin: 0;
+    gap: 4px;
+    justify-content: flex-end;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .lesson-study-audio.is-collapsed:has(.audio-player) .audio-time #audio-total::before {
+    content: "/ ";
+  }
+
+  .lesson-study-audio.is-collapsed:has(.audio-player) .btn-play-round {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    font-size: 18px;
+  }
+
+  .lesson-study-audio.is-collapsed:has(.audio-player) .btn-skip,
+  .lesson-study-audio.is-collapsed:has(.audio-player) .audio-seek,
+  .lesson-study-audio.is-collapsed:has(.audio-player) .speed-row,
+  .lesson-study-audio.is-collapsed:has(.audio-player) .player-btns,
+  .lesson-study-audio.is-collapsed:has(.audio-player) .form-actions {
+    display: none;
   }
 }
 
@@ -2283,17 +2387,30 @@ a.listen-pick-card {
 .listen-play {
   flex: 1;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
   gap: 10px;
   min-height: 0;
+}
+
+.listen-player-dock {
+  position: relative;
+  z-index: 16;
+  width: 100%;
+  padding: 0;
 }
 
 .listen-player {
   position: relative;
   z-index: 16;
   margin: 0;
-  padding: 10px 12px 8px;
+  padding: 4px 12px 10px;
   box-shadow: var(--shadow);
+}
+
+.listen-player .audio-sheet-handle {
+  display: flex;
+  margin: 0 -12px 6px;
+  min-height: 44px;
 }
 
 .listen-player-main {
@@ -2484,6 +2601,56 @@ html.listen-play-lock #app {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.listen-mini-now {
+  display: none;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.listen-player-dock.is-collapsed .listen-player {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "handle handle"
+    "main main";
+  align-items: center;
+  column-gap: 10px;
+  padding: 0 8px 8px;
+}
+
+.listen-player-dock.is-collapsed .audio-sheet-handle {
+  grid-area: handle;
+  margin: 0 -8px;
+  min-height: 40px;
+}
+
+.listen-player-dock.is-collapsed .listen-player-main {
+  grid-area: main;
+}
+
+.listen-player-dock.is-collapsed .listen-transport {
+  margin: 0;
+}
+
+.listen-player-dock.is-collapsed .listen-player-tools,
+.listen-player-dock.is-collapsed .btn-skip,
+.listen-player-dock.is-collapsed .player-kicker,
+.listen-player-dock.is-collapsed .book-title,
+.listen-player-dock.is-collapsed [data-listen-now] {
+  display: none;
+}
+
+.listen-player-dock.is-collapsed .listen-mini-now {
+  display: block;
+}
+
+.listen-player-dock.is-collapsed .btn-play-round {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  font-size: 18px;
 }
 
 html.review-lock,
@@ -2727,6 +2894,10 @@ html.listen-wide body,
   .shell-lesson .bottom-nav,
   .shell-listen .bottom-nav {
     width: min(1120px, 100%);
+  }
+
+  .lesson-study-audio .audio-sheet-handle {
+    display: none;
   }
 
   .lesson-study {

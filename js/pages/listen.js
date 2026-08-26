@@ -1,7 +1,7 @@
 import { getAllLessons, getLessonsByBook, groupBooks, hasAudio, getFullAudioTrack } from "../storage/lessons.js?v=20260825c";
 import { getStoredBookTitles } from "../storage/books.js?v=20260816w";
 import { getAudio } from "../storage/audio.js?v=20260825c";
-import { getAudioElement, stopAudio, swapAudio } from "../services/audioPlayer.js?v=20260826e";
+import { getAudioElement, stopAudio, swapAudio } from "../services/audioPlayer.js?v=20260827d";
 import { escapeHtml, formatTime, naturalCompare, nl2br, toast } from "../utils.js?v=20260816p";
 
 const SPEEDS = [0.8, 0.9, 1.0, 1.1, 1.2];
@@ -9,6 +9,7 @@ const SPEEDS = [0.8, 0.9, 1.0, 1.1, 1.2];
 let sessionId = 0;
 let playing = false;
 let playbackRate = 1;
+let rangeDraft = null;
 
 export function stopListenSession() {
   sessionId += 1;
@@ -43,7 +44,7 @@ export async function renderListen(el, route) {
 
 function clearPlayLayout(el) {
   el?.classList.remove("content-listen-play");
-  document.documentElement.classList.remove("listen-play-lock");
+  document.documentElement.classList.remove("listen-play-lock", "listen-player-collapsed");
   document.body.classList.remove("listen-play-lock");
   document.querySelector(".shell-listen")?.classList.remove("shell-listen-play");
 }
@@ -53,6 +54,24 @@ function applyPlayLayout(el) {
   document.documentElement.classList.add("listen-play-lock");
   document.body.classList.add("listen-play-lock");
   document.querySelector(".shell-listen")?.classList.add("shell-listen-play");
+}
+
+const LISTEN_SHEET_KEY = "elr-listen-sheet-collapsed";
+
+function readListenCollapsed() {
+  try {
+    return window.localStorage.getItem(LISTEN_SHEET_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeListenCollapsed(collapsed) {
+  try {
+    window.localStorage.setItem(LISTEN_SHEET_KEY, collapsed ? "1" : "0");
+  } catch {
+    /* private mode / quota */
+  }
 }
 
 async function renderBookList(el) {
@@ -199,11 +218,27 @@ async function renderChapterList(el, bookTitle, scripturePart = "") {
     </section>
   `;
 
+  const draft = rangeDraftMatches(title, part);
   bindRangeControls(el, title, groups, {
-    startKey: groups[0]?.key || "",
-    endKey: groups[0]?.key || "",
+    startKey: draft?.startKey || groups[0]?.key || "",
+    endKey: draft?.endKey || draft?.startKey || groups[0]?.key || "",
+    pendingEnd: Boolean(draft?.pendingEnd),
     scripturePart: part,
   });
+}
+
+function rangeDraftMatches(title, part) {
+  const key = `${title}\0${part || ""}`;
+  return rangeDraft?.key === key ? rangeDraft : null;
+}
+
+function saveRangeDraft(title, part, startKey, endKey, pendingEnd) {
+  rangeDraft = {
+    key: `${title}\0${part || ""}`,
+    startKey,
+    endKey,
+    pendingEnd: Boolean(pendingEnd),
+  };
 }
 
 function chapterChipsHtml(groups, numbered) {
@@ -226,7 +261,7 @@ function bindRangeControls(el, title, groups, initial = {}) {
   const scripturePart = initial.scripturePart || "";
   let startKey = initial.startKey || groups[0]?.key || "";
   let endKey = initial.endKey || startKey;
-  let pendingEnd = false;
+  let pendingEnd = Boolean(initial.pendingEnd);
 
   const selectedRange = () => orderedRange(groups, startKey, endKey);
 
@@ -265,6 +300,7 @@ function bindRangeControls(el, title, groups, initial = {}) {
     startKey = nextStart;
     endKey = nextEnd;
     pendingEnd = pending;
+    saveRangeDraft(title, scripturePart, startKey, endKey, pendingEnd);
     paint();
     revealChip(pending ? startKey : endKey);
     if (play) startPlayback(el, title, groups, startKey, endKey, scripturePart);
@@ -286,8 +322,10 @@ function bindRangeControls(el, title, groups, initial = {}) {
   });
   playBtn?.addEventListener("click", () => {
     const range = selectedRange();
+    saveRangeDraft(title, scripturePart, range.startKey, range.endKey, false);
     startPlayback(el, title, groups, range.startKey, range.endKey, scripturePart);
   });
+  saveRangeDraft(title, scripturePart, startKey, endKey, pendingEnd);
   paint();
 }
 
@@ -420,6 +458,7 @@ function startPlayback(el, bookTitle, groups, startKey, endKey, scripturePart = 
   playing = true;
   let index = 0;
   let seeking = false;
+  let framed = false;
   const blobs = new Map();
 
   const loadBlob = async (lesson) => {
@@ -456,6 +495,7 @@ function startPlayback(el, bookTitle, groups, startKey, endKey, scripturePart = 
 
   const bindPlayer = (audio) => {
     audio.playbackRate = playbackRate;
+    audio._keepAliveOnEnded = true;
     audio.ontimeupdate = paint;
     audio.onloadedmetadata = paint;
     audio.onplay = paint;
@@ -475,19 +515,25 @@ function startPlayback(el, bookTitle, groups, startKey, endKey, scripturePart = 
       await renderChapterList(el, bookTitle, scripturePart);
       return;
     }
-    index = nextIndex;
-    const lesson = queue[index];
-    drawPlayer(el, bookTitle, queue, index, rangeText);
-    window.scrollTo(0, 0);
-    bindDrawnControls();
+    const lesson = queue[nextIndex];
+    getAudioElement()?.pause();
     const blob = await loadBlob(lesson);
     if (mySession !== sessionId) return;
     if (!blob) {
       toast("저장된 오디오를 찾지 못해 다음 페이지로 넘어갑니다.");
-      await playAt(index + 1, { auto: true });
+      await playAt(nextIndex + 1, { auto: true });
       return;
     }
+    index = nextIndex;
     const audio = swapAudio(blob);
+    if (!framed) {
+      drawPlayer(el, bookTitle, queue, index, rangeText);
+      bindListenSheet(el);
+      bindDrawnControls();
+      framed = true;
+    } else {
+      updatePlayerNow(el, bookTitle, queue, index, rangeText);
+    }
     bindPlayer(audio);
     paint();
     preloadAround(index);
@@ -565,6 +611,73 @@ function startPlayback(el, bookTitle, groups, startKey, endKey, scripturePart = 
   playAt(0);
 }
 
+function nowLine(queue, index) {
+  const lesson = queue[index];
+  const next = queue[index + 1];
+  return `${lesson.chapter} · Page ${lesson.page} · ${index + 1} / ${queue.length}${
+    next ? ` · 다음 ${next.chapter} · Page ${next.page}` : ""
+  }`;
+}
+
+function scriptHtml(lesson) {
+  const script = String(lesson.script || "").trim();
+  return script ? nl2br(script) : `<span class="muted">이 페이지에 영문 스크립트가 없습니다.</span>`;
+}
+
+function koreanHtml(lesson) {
+  const korean = String(lesson.literalTranslationKo || "").trim();
+  return korean ? nl2br(korean) : `<span class="muted">이 페이지에 한글 직역이 없습니다.</span>`;
+}
+
+function updatePlayerNow(el, bookTitle, queue, index, rangeText) {
+  const lesson = queue[index];
+  const next = queue[index + 1];
+  const now = el.querySelector("[data-listen-now]");
+  if (now) now.textContent = nowLine(queue, index);
+  const mini = el.querySelector("[data-listen-mini]");
+  if (mini) mini.textContent = `${lesson.chapter} · ${index + 1}/${queue.length}`;
+  const nextBtn = el.querySelector("#listen-next");
+  if (nextBtn) nextBtn.disabled = !next;
+  const kicker = el.querySelector("[data-listen-range]");
+  if (kicker) kicker.textContent = `연속듣기${rangeText ? ` · ${rangeText}` : ""}`;
+  const scriptEl = el.querySelector("#listen-script");
+  const koEl = el.querySelector("#listen-ko");
+  if (scriptEl) {
+    scriptEl.innerHTML = scriptHtml(lesson);
+    scriptEl.scrollTop = 0;
+  }
+  if (koEl) {
+    koEl.innerHTML = koreanHtml(lesson);
+    koEl.scrollTop = 0;
+  }
+}
+
+function bindListenSheet(el) {
+  const dock = el.querySelector("#listen-player-dock");
+  if (!dock) return;
+  const apply = (collapsed) => {
+    dock.classList.toggle("is-collapsed", collapsed);
+    document.documentElement.classList.toggle("listen-player-collapsed", collapsed);
+    const toggle = dock.querySelector("#listen-sheet-toggle");
+    toggle?.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    const hint = toggle?.querySelector("[data-collapse-label]");
+    if (hint) hint.textContent = collapsed ? "터치해서 펼치기" : "터치해서 숨기기";
+  };
+  apply(readListenCollapsed());
+  dock.querySelector("#listen-sheet-toggle")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    const next = !dock.classList.contains("is-collapsed");
+    writeListenCollapsed(next);
+    apply(next);
+  });
+  dock.addEventListener("click", (event) => {
+    if (!dock.classList.contains("is-collapsed")) return;
+    if (event.target.closest("#listen-play, #listen-sheet-toggle, #listen-stop")) return;
+    writeListenCollapsed(false);
+    apply(false);
+  });
+}
+
 function drawPlayer(el, bookTitle, queue, index, rangeText = "") {
   const lesson = queue[index];
   const next = queue[index + 1];
@@ -573,58 +686,57 @@ function drawPlayer(el, bookTitle, queue, index, rangeText = "") {
     const text = speed === 1 ? "1.0x" : `${speed}x`;
     return `<button type="button" class="chip ${active}" data-listen-rate="${speed}">${text}</button>`;
   }).join("");
-  const script = String(lesson.script || "").trim();
-  const korean = String(lesson.literalTranslationKo || "").trim();
 
   applyPlayLayout(el);
   el.innerHTML = `
     <section class="listen-play">
-      <div class="player listen-player">
-        <div class="listen-player-main">
-          <div class="listen-now">
-            <div class="player-kicker">연속듣기${rangeText ? ` · ${escapeHtml(rangeText)}` : ""}</div>
-            <div class="book-title">${escapeHtml(bookTitle)}</div>
-            <div class="muted">${escapeHtml(lesson.chapter)} · Page ${escapeHtml(lesson.page)} · ${index + 1} / ${queue.length}${
-              next ? ` · 다음 ${escapeHtml(next.chapter)} · Page ${escapeHtml(next.page)}` : ""
-            }</div>
-          </div>
-          <div class="audio-transport listen-transport">
-            <button type="button" class="btn btn-ghost btn-skip" id="listen-back" aria-label="5초 뒤로">-5초</button>
-            <button type="button" class="btn btn-play btn-play-round" id="listen-play" aria-label="재생">▶</button>
-            <button type="button" class="btn btn-ghost btn-skip" id="listen-fwd" aria-label="5초 앞으로">+5초</button>
-          </div>
-        </div>
-        <div class="listen-player-tools">
-          <div class="listen-seek-row">
-            <span id="listen-current">00:00</span>
-            <input id="listen-seek" class="audio-seek" type="range" min="0" max="1" value="0" step="0.1">
-            <span id="listen-total">00:00</span>
-          </div>
-          <div class="listen-tool-row">
-            <div class="speed-row">${speeds}</div>
-            <div class="listen-tool-actions">
-              <button type="button" class="text-btn" id="listen-restart">처음부터</button>
-              <button type="button" class="text-btn" id="listen-next" ${next ? "" : "disabled"}>다음 페이지</button>
-              <button type="button" class="text-btn" id="listen-chapters">구간 선택</button>
-              <button type="button" class="text-btn danger" id="listen-stop">중단</button>
-            </div>
-          </div>
-        </div>
-      </div>
       <div class="listen-texts">
         <section class="listen-col">
           <h2>영문 Script</h2>
-          <div class="listen-script">${
-            script ? nl2br(script) : `<span class="muted">이 페이지에 영문 스크립트가 없습니다.</span>`
-          }</div>
+          <div class="listen-script" id="listen-script">${scriptHtml(lesson)}</div>
         </section>
         <section class="listen-col">
           <h2>한글 직역</h2>
-          <div class="listen-ko">${
-            korean ? nl2br(korean) : `<span class="muted">이 페이지에 한글 직역이 없습니다.</span>`
-          }</div>
+          <div class="listen-ko" id="listen-ko">${koreanHtml(lesson)}</div>
         </section>
       </div>
+      <aside class="listen-player-dock" id="listen-player-dock">
+        <div class="player listen-player">
+          <button type="button" class="audio-sheet-handle" id="listen-sheet-toggle" aria-expanded="true">
+            <span class="audio-sheet-pill" aria-hidden="true"></span>
+            <span class="audio-sheet-hint" data-collapse-label>터치해서 숨기기</span>
+          </button>
+          <div class="listen-player-main">
+            <div class="listen-now">
+              <div class="player-kicker" data-listen-range>연속듣기${rangeText ? ` · ${escapeHtml(rangeText)}` : ""}</div>
+              <div class="book-title">${escapeHtml(bookTitle)}</div>
+              <div class="muted" data-listen-now>${escapeHtml(nowLine(queue, index))}</div>
+              <div class="listen-mini-now" data-listen-mini>${escapeHtml(lesson.chapter)} · ${index + 1}/${queue.length}</div>
+            </div>
+            <div class="audio-transport listen-transport">
+              <button type="button" class="btn btn-ghost btn-skip" id="listen-back" aria-label="5초 뒤로">-5초</button>
+              <button type="button" class="btn btn-play btn-play-round" id="listen-play" aria-label="재생">▶</button>
+              <button type="button" class="btn btn-ghost btn-skip" id="listen-fwd" aria-label="5초 앞으로">+5초</button>
+            </div>
+          </div>
+          <div class="listen-player-tools">
+            <div class="listen-seek-row">
+              <span id="listen-current">00:00</span>
+              <input id="listen-seek" class="audio-seek" type="range" min="0" max="1" value="0" step="0.1">
+              <span id="listen-total">00:00</span>
+            </div>
+            <div class="listen-tool-row">
+              <div class="speed-row">${speeds}</div>
+              <div class="listen-tool-actions">
+                <button type="button" class="text-btn" id="listen-restart">처음부터</button>
+                <button type="button" class="text-btn" id="listen-next" ${next ? "" : "disabled"}>다음 페이지</button>
+                <button type="button" class="text-btn" id="listen-chapters">구간 선택</button>
+                <button type="button" class="text-btn danger" id="listen-stop">중단</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
     </section>
   `;
 }

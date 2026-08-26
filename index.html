@@ -4,16 +4,23 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#f4f0e8" />
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Listening Reader" />
     <title>English Listening Reader</title>
-    <link rel="stylesheet" href="./css/styles.css?v=20260826i" />
+    <link rel="icon" type="image/png" sizes="32x32" href="./icons/favicon-32.png?v=20260827h" />
+    <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png?v=20260827h" />
+    <link rel="manifest" href="./manifest.webmanifest?v=20260827h" />
+    <link rel="stylesheet" href="./css/styles.css?v=20260827e" />
   </head>
   <body>
     <div id="app">
       <p class="boot-msg">Listening Reader를 여는 중입니다.</p>
     </div>
     <aside id="now-playing" hidden></aside>
-    <script type="module" src="./js/main.js?v=20260826i"></script>
+    <script type="module">
+      import(`./js/main.js?v=20260827h&t=${Date.now()}`);
+    </script>
   </body>
 </html>

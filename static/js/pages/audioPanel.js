@@ -1,10 +1,28 @@
 import { uid, escapeHtml, formatTime, formatBytes, toast } from "../utils.js?v=20260816p";
 import { saveLesson, getFullAudioTrack } from "../storage/lessons.js?v=20260825c";
 import { saveAudio, getAudio, deleteAudio, readAudioDuration, isAudioFile, MAX_AUDIO_BYTES, audioFileInputAttrs } from "../storage/audio.js?v=20260825c";
-import { attachAudio, stopAudio, getAudioElement, isLessonPlaying, setNowPlaying } from "../services/audioPlayer.js?v=20260826e";
+import { attachAudio, stopAudio, getAudioElement, isLessonPlaying, setNowPlaying } from "../services/audioPlayer.js?v=20260827d";
 
 const SPEEDS = [0.8, 0.9, 1.0, 1.1, 1.2];
+const SHEET_COLLAPSED_KEY = "elr-audio-sheet-collapsed";
+let audioPanelGen = 0;
 // TODO: add a 10-second A-B loop control on top of HTMLAudioElement.
+
+function readSheetCollapsed() {
+  try {
+    return window.localStorage.getItem(SHEET_COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeSheetCollapsed(collapsed) {
+  try {
+    window.localStorage.setItem(SHEET_COLLAPSED_KEY, collapsed ? "1" : "0");
+  } catch {
+    /* private mode / quota */
+  }
+}
 
 export function audioPanelMarkup(lesson) {
   return `<aside class="lesson-study-audio" id="audio-panel">${emptyAudioMarkup()}</aside>`;
@@ -67,6 +85,10 @@ function playerMarkup(track) {
 
   return `
     <div class="player audio-player">
+      <button type="button" class="audio-sheet-handle" id="audio-sheet-toggle" aria-expanded="true">
+        <span class="audio-sheet-pill" aria-hidden="true"></span>
+        <span class="audio-sheet-hint" data-collapse-label>터치해서 숨기기</span>
+      </button>
       <div class="player-kicker">🎧 Listening</div>
       <p class="audio-file-name">${escapeHtml(track.fileName || "audio")}</p>
       <div class="audio-transport">
@@ -101,14 +123,47 @@ function playerMarkup(track) {
 export async function bindAudioPanel(root, lesson) {
   const mount = root.querySelector("#audio-panel");
   if (!mount) return;
+  const gen = ++audioPanelGen;
+  const stillCurrent = () => gen === audioPanelGen && mount.isConnected;
+
+  if (!isLessonPlaying(lesson.id)) stopAudio();
 
   let pendingFile = null;
   let pendingDuration = 0;
   let pendingUrl = "";
   let loopOn = false;
 
+  const applySheet = (collapsed) => {
+    mount.classList.toggle("is-collapsed", collapsed);
+    const toggle = mount.querySelector("#audio-sheet-toggle");
+    if (!toggle) return;
+    toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    const hint = toggle.querySelector("[data-collapse-label]");
+    if (hint) hint.textContent = collapsed ? "터치해서 펼치기" : "터치해서 숨기기";
+  };
+
+  const setSheet = (collapsed) => {
+    writeSheetCollapsed(collapsed);
+    applySheet(collapsed);
+  };
+
+  const bindSheet = () => {
+    mount.classList.add("has-player");
+    applySheet(readSheetCollapsed());
+    mount.querySelector("#audio-sheet-toggle")?.addEventListener("click", (event) => {
+      event.preventDefault();
+      setSheet(!mount.classList.contains("is-collapsed"));
+    });
+    mount.querySelector(".audio-player")?.addEventListener("click", (event) => {
+      if (!mount.classList.contains("is-collapsed")) return;
+      if (event.target.closest("#audio-play, #audio-sheet-toggle")) return;
+      setSheet(false);
+    });
+  };
+
   const renderEmpty = () => {
     stopAudio();
+    mount.classList.remove("is-collapsed", "has-player");
     mount.innerHTML = emptyAudioMarkup();
     bindEmpty();
   };
@@ -135,9 +190,11 @@ export async function bindAudioPanel(root, lesson) {
     }
     pendingFile = file;
     pendingDuration = await readAudioDuration(file);
+    if (!stillCurrent()) return;
     if (pendingUrl) URL.revokeObjectURL(pendingUrl);
     pendingUrl = URL.createObjectURL(file);
     stopAudio();
+    mount.classList.remove("is-collapsed", "has-player");
     mount.innerHTML = previewMarkup(file, pendingDuration);
     mount.querySelector("#audio-preview-play")?.addEventListener("click", () => {
       const audio = attachAudio(file);
@@ -188,6 +245,7 @@ export async function bindAudioPanel(root, lesson) {
       lesson.audioTracks.push(track);
       lesson.updatedAt = new Date().toISOString();
       await saveLesson(lesson);
+      if (!stillCurrent()) return;
       if (old?.audioId) {
         try {
           await deleteAudio(old.audioId);
@@ -226,8 +284,10 @@ export async function bindAudioPanel(root, lesson) {
     const existing = reuse ? getAudioElement() : null;
     if (!existing) {
       const record = await getAudio(track.audioId);
+      if (!stillCurrent()) return;
       if (!record?.blob) {
-        mount.innerHTML = missingAudioMarkup(track);
+      mount.classList.remove("is-collapsed", "has-player");
+      mount.innerHTML = missingAudioMarkup(track);
         mount.querySelector("#audio-retry")?.addEventListener("click", async () => {
           toast("클라우드에서 다시 찾습니다.");
           await showPlayer(track);
@@ -270,6 +330,7 @@ export async function bindAudioPanel(root, lesson) {
   };
 
   const bindPlayer = (audio, track) => {
+    bindSheet();
     const playBtn = mount.querySelector("#audio-play");
     const currentEl = mount.querySelector("#audio-current");
     const totalEl = mount.querySelector("#audio-total");
