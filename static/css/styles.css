@@ -2186,6 +2186,85 @@ a.listen-pick-card {
   font-weight: 800;
 }
 
+.listen-range-card {
+  display: grid;
+  gap: 14px;
+  margin: 0 0 16px;
+  padding: 16px;
+}
+
+.listen-range-picked {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.listen-range-picked > div {
+  display: grid;
+  gap: 4px;
+}
+
+.listen-range-picked .muted {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.listen-range-picked strong {
+  font-size: 16px;
+  line-height: 1.3;
+}
+
+.listen-chip-section {
+  display: grid;
+  gap: 8px;
+}
+
+.listen-chip-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.listen-chip-head h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.listen-chap-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.listen-chap-chip {
+  min-width: 48px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: inherit;
+  font-weight: 800;
+}
+
+.listen-chap-chip.is-in-range {
+  background: var(--accent-soft);
+  border-color: #c5d4c8;
+  color: var(--accent-2);
+}
+
+.listen-chap-chip.is-start,
+.listen-chap-chip.is-end {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #f7f4ee;
+}
+
+.listen-range-summary {
+  margin: 0;
+}
+
 .listen-play {
   flex: 1;
   display: grid;

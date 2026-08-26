@@ -60,7 +60,7 @@ async function renderBookList(el) {
       <div class="section-head">
         <h2>책 선택</h2>
       </div>
-      <p class="hint">책을 고르면 챕터를 선택할 수 있습니다. 선택한 챕터부터 페이지 순서대로 오디오가 이어집니다.</p>
+      <p class="hint">책을 고르면 시작 챕터와 끝 챕터를 지정해서 그 구간만 이어서 들을 수 있습니다.</p>
       ${
         books.length
           ? `<div class="stack">${books
@@ -92,6 +92,8 @@ async function renderChapterList(el, bookTitle) {
 
   const lessons = await getLessonsByBook(title);
   const groups = groupListenChapters(lessons);
+  const scripture = usesScriptureGroups(title, groups);
+  const books = scripture ? scriptureBookGroups(groups) : [];
 
   el.innerHTML = `
     <section class="section">
@@ -99,95 +101,259 @@ async function renderChapterList(el, bookTitle) {
         <h2>${escapeHtml(title)}</h2>
         <button type="button" class="text-btn" data-go="#/listen">책 다시 선택</button>
       </div>
-      <p class="hint">챕터를 누르면 그 챕터의 첫 페이지부터 재생합니다. 멈추지 않으면 다음 챕터로 자동으로 이어집니다.</p>
+      <p class="hint" id="listen-range-hint">${
+        scripture
+          ? "시작 장을 누른 다음 끝 장을 누르세요. 예: 33을 누르고 35를 누르면 33~35장만 듣습니다."
+          : "시작 챕터를 누른 다음 끝 챕터를 누르세요. 예: 1을 누르고 2를 누르면 1~2장만 듣습니다."
+      }</p>
       ${
         groups.length
-          ? `<div class="stack">${groups
+          ? `
+      <div class="card listen-range-card">
+        <div class="listen-range-picked">
+          <div><span class="muted">시작</span><strong id="listen-start-label"></strong></div>
+          <div><span class="muted">끝</span><strong id="listen-end-label"></strong></div>
+        </div>
+        ${
+          scripture
+            ? books
+                .map(
+                  (book) => `
+        <div class="listen-chip-section">
+          <div class="listen-chip-head">
+            <h3>${escapeHtml(book.key)}</h3>
+            <button type="button" class="text-btn" data-listen-book-start="${escapeHtml(book.startKey)}" data-listen-book-end="${escapeHtml(book.endKey)}">전체 선택</button>
+          </div>
+          <div class="listen-chap-chips">${chapterChipsHtml(book.chapters, true)}</div>
+        </div>`
+                )
+                .join("")
+            : `<div class="listen-chap-chips">${chapterChipsHtml(groups, false)}</div>`
+        }
+        <p class="muted listen-range-summary" id="listen-range-summary"></p>
+        <button type="button" class="btn btn-wide" id="listen-range-play">이 구간 듣기</button>
+      </div>
+      ${
+        scripture
+          ? ""
+          : `<div class="stack">${groups
               .map((group) => {
                 const audioPages = group.pages.filter(hasAudio).length;
-                const range = chapterRangeLabel(group);
                 return `
-            <button type="button" class="card book-card listen-pick-card" data-listen-chapter="${escapeHtml(group.key)}">
+            <button type="button" class="card book-card listen-pick-card" data-listen-book-start="${escapeHtml(group.key)}" data-listen-book-end="${escapeHtml(group.key)}" data-listen-play-now>
               <div>
                 <div class="book-title">${escapeHtml(group.key)}</div>
-                <div class="muted">${escapeHtml(range)} · ${group.pages.length} pages${audioPages ? ` · 🎧 ${audioPages}` : " · 오디오 없음"}</div>
+                <div class="muted">${group.pages.length} pages${audioPages ? ` · 🎧 ${audioPages}` : " · 오디오 없음"}</div>
               </div>
               <span class="listen-pick-go">듣기</span>
             </button>`;
               })
               .join("")}</div>`
+      }`
           : `<div class="empty">이 책에 재생할 페이지가 없습니다.</div>`
       }
     </section>
   `;
 
-  el.querySelectorAll("[data-listen-chapter]").forEach((btn) => {
+  bindRangeControls(el, title, groups, {
+    startKey: groups[0]?.key || "",
+    endKey: scripture && books[0] ? books[0].endKey : groups[0]?.key || "",
+  });
+}
+
+function chapterChipsHtml(groups, numbered) {
+  return groups
+    .map((group) => {
+      const parts = parseChapterName(group.key);
+      const label = numbered && parts.number != null ? String(parts.number) : group.key;
+      return `<button type="button" class="listen-chap-chip" data-listen-chip="${escapeHtml(group.key)}" aria-label="${escapeHtml(group.key)}">${escapeHtml(label)}</button>`;
+    })
+    .join("");
+}
+
+function bindRangeControls(el, title, groups, initial = {}) {
+  const summary = el.querySelector("#listen-range-summary");
+  const playBtn = el.querySelector("#listen-range-play");
+  const hint = el.querySelector("#listen-range-hint");
+  const startLabel = el.querySelector("#listen-start-label");
+  const endLabel = el.querySelector("#listen-end-label");
+  const defaultHint = hint?.textContent || "";
+  let startKey = initial.startKey || groups[0]?.key || "";
+  let endKey = initial.endKey || startKey;
+  let pendingEnd = false;
+
+  const selectedRange = () => orderedRange(groups, startKey, endKey);
+
+  const paint = () => {
+    const range = selectedRange();
+    const startIdx = groups.findIndex((group) => group.key === range.startKey);
+    const endIdx = groups.findIndex((group) => group.key === range.endKey);
+    el.querySelectorAll("[data-listen-chip]").forEach((btn) => {
+      const key = btn.getAttribute("data-listen-chip") || "";
+      const idx = groups.findIndex((group) => group.key === key);
+      const inRange = startIdx >= 0 && idx >= startIdx && idx <= endIdx;
+      btn.classList.toggle("is-in-range", inRange);
+      btn.classList.toggle("is-start", key === range.startKey);
+      btn.classList.toggle("is-end", key === range.endKey);
+    });
+    if (startLabel) startLabel.textContent = range.startKey || "-";
+    if (endLabel) endLabel.textContent = range.endKey || "-";
+    if (summary) {
+      const label = range.startKey && range.startKey === range.endKey ? range.startKey : `${range.startKey} – ${range.endKey}`;
+      summary.textContent = range.queue.length
+        ? `${label} · 🎧 ${range.queue.length}`
+        : "이 구간에 오디오가 없습니다.";
+    }
+    if (playBtn) playBtn.disabled = !range.queue.length;
+    if (hint) {
+      hint.textContent = pendingEnd ? "끝 장을 눌러 주세요." : defaultHint;
+    }
+  };
+
+  const setRange = (nextStart, nextEnd, { pending = false, play = false } = {}) => {
+    startKey = nextStart;
+    endKey = nextEnd;
+    pendingEnd = pending;
+    paint();
+    if (play) startPlayback(el, title, groups, startKey, endKey);
+  };
+
+  el.querySelectorAll("[data-listen-chip]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const key = btn.getAttribute("data-listen-chapter") || "";
-      startPlayback(el, title, key, groups);
+      const key = btn.getAttribute("data-listen-chip") || "";
+      if (!pendingEnd) setRange(key, key, { pending: true });
+      else setRange(startKey, key, { pending: false });
     });
   });
+  el.querySelectorAll("[data-listen-book-start]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const nextStart = btn.getAttribute("data-listen-book-start") || "";
+      const nextEnd = btn.getAttribute("data-listen-book-end") || nextStart;
+      setRange(nextStart, nextEnd, { play: btn.hasAttribute("data-listen-play-now") });
+    });
+  });
+  playBtn?.addEventListener("click", () => {
+    const range = selectedRange();
+    startPlayback(el, title, groups, range.startKey, range.endKey);
+  });
+  paint();
+}
+
+const GENERIC_CHAPTER_PREFIXES = new Set([
+  "chapter",
+  "ch",
+  "chap",
+  "챕터",
+  "part",
+  "unit",
+  "lesson",
+  "book",
+  "장",
+]);
+
+function parseChapterName(chapter) {
+  const raw = String(chapter || "").trim() || "기타";
+  const match = raw.match(/^(.*?)[\s._-]*(\d+)\s*(?:장|chapter)?\s*$/i);
+  if (!match) return { raw, prefix: "", number: null };
+  const prefix = String(match[1] || "")
+    .trim()
+    .replace(/[.\s]+$/g, "");
+  const number = Number(match[2]);
+  if (!prefix) return { raw, prefix: "", number };
+  return { raw, prefix, number };
+}
+
+function isScripturePrefix(prefix) {
+  const key = String(prefix || "").trim();
+  if (!key) return false;
+  return !GENERIC_CHAPTER_PREFIXES.has(key.toLowerCase());
+}
+
+function usesScriptureGroups(bookTitle, groups) {
+  if (/bible|성경/i.test(String(bookTitle || ""))) return true;
+  const prefixes = new Set();
+  for (const group of groups) {
+    const parts = parseChapterName(group.key);
+    if (parts.number == null || !isScripturePrefix(parts.prefix)) continue;
+    prefixes.add(parts.prefix);
+  }
+  return prefixes.size >= 2;
 }
 
 function groupListenChapters(lessons) {
   const map = new Map();
   const order = [];
   for (const lesson of lessons) {
-    const key = listenChapterKey(lesson.chapter);
+    const key = String(lesson.chapter || "").trim() || "기타";
     if (!map.has(key)) {
       map.set(key, []);
       order.push(key);
     }
     map.get(key).push(lesson);
   }
-  return order.map((key) => {
-    const pages = map.get(key).slice().sort((a, b) => {
-      const chapter = naturalCompare(a.chapter, b.chapter);
-      if (chapter !== 0) return chapter;
-      return naturalCompare(a.page, b.page);
+  return order
+    .slice()
+    .sort(naturalCompare)
+    .map((key) => {
+      const pages = map.get(key).slice().sort((a, b) => {
+        const chapter = naturalCompare(a.chapter, b.chapter);
+        if (chapter !== 0) return chapter;
+        return naturalCompare(a.page, b.page);
+      });
+      return { key, pages };
     });
-    return { key, pages };
+}
+
+function scriptureBookGroups(groups) {
+  const map = new Map();
+  const order = [];
+  for (const group of groups) {
+    const parts = parseChapterName(group.key);
+    if (parts.number == null || !isScripturePrefix(parts.prefix)) continue;
+    if (!map.has(parts.prefix)) {
+      map.set(parts.prefix, []);
+      order.push(parts.prefix);
+    }
+    map.get(parts.prefix).push(group);
+  }
+  return order.map((key) => {
+    const chapters = map.get(key);
+    return {
+      key,
+      startKey: chapters[0].key,
+      endKey: chapters[chapters.length - 1].key,
+      pages: chapters.flatMap((chapter) => chapter.pages),
+      chapters,
+    };
   });
 }
 
-function listenChapterKey(chapter) {
-  const raw = String(chapter || "").trim();
-  if (!raw) return "기타";
-  const match = raw.match(/^([가-힣]+(?:\s*[가-힣]+)*)\s*(\d+)/);
-  if (match) return match[1].trim();
-  return raw;
-}
-
-function chapterRangeLabel(group) {
-  const names = [];
-  const seen = new Set();
-  for (const lesson of group.pages) {
-    const name = String(lesson.chapter || "").trim();
-    if (!name || seen.has(name)) continue;
-    seen.add(name);
-    names.push(name);
-  }
-  if (!names.length) return group.key;
-  if (names.length === 1) return names[0];
-  return `${names[0]} – ${names[names.length - 1]}`;
-}
-
-function queueFromChapter(groups, startKey) {
-  const start = groups.findIndex((group) => group.key === startKey);
-  if (start < 0) return [];
+function orderedRange(groups, startKey, endKey) {
+  let start = groups.findIndex((group) => group.key === startKey);
+  let end = groups.findIndex((group) => group.key === endKey);
+  if (start < 0 && end < 0) return { startKey: "", endKey: "", queue: [] };
+  if (start < 0) start = end;
+  if (end < 0) end = start;
+  if (start > end) [start, end] = [end, start];
   const queue = [];
-  for (const group of groups.slice(start)) {
+  for (const group of groups.slice(start, end + 1)) {
     queue.push(...group.pages.filter(hasAudio));
   }
-  return queue;
+  return {
+    startKey: groups[start].key,
+    endKey: groups[end].key,
+    queue,
+  };
 }
 
-function startPlayback(el, bookTitle, startKey, groups) {
-  const queue = queueFromChapter(groups, startKey);
+function startPlayback(el, bookTitle, groups, startKey, endKey) {
+  const range = orderedRange(groups, startKey, endKey);
+  const queue = range.queue;
   if (!queue.length) {
-    toast("이 챕터부터 이어서 들을 오디오가 없습니다.");
+    toast("이 구간에 들을 오디오가 없습니다.");
     return;
   }
+  const rangeText = range.startKey === range.endKey ? range.startKey : `${range.startKey} – ${range.endKey}`;
 
   const mySession = ++sessionId;
   playing = true;
@@ -250,7 +416,7 @@ function startPlayback(el, bookTitle, startKey, groups) {
     }
     index = nextIndex;
     const lesson = queue[index];
-    drawPlayer(el, bookTitle, queue, index);
+    drawPlayer(el, bookTitle, queue, index, rangeText);
     window.scrollTo(0, 0);
     bindDrawnControls();
     const blob = await loadBlob(lesson);
@@ -338,7 +504,7 @@ function startPlayback(el, bookTitle, startKey, groups) {
   playAt(0);
 }
 
-function drawPlayer(el, bookTitle, queue, index) {
+function drawPlayer(el, bookTitle, queue, index, rangeText = "") {
   const lesson = queue[index];
   const next = queue[index + 1];
   const speeds = SPEEDS.map((speed) => {
@@ -355,7 +521,7 @@ function drawPlayer(el, bookTitle, queue, index) {
       <div class="player listen-player">
         <div class="listen-player-main">
           <div class="listen-now">
-            <div class="player-kicker">연속듣기</div>
+            <div class="player-kicker">연속듣기${rangeText ? ` · ${escapeHtml(rangeText)}` : ""}</div>
             <div class="book-title">${escapeHtml(bookTitle)}</div>
             <div class="muted">${escapeHtml(lesson.chapter)} · Page ${escapeHtml(lesson.page)} · ${index + 1} / ${queue.length}${
               next ? ` · 다음 ${escapeHtml(next.chapter)} · Page ${escapeHtml(next.page)}` : ""
@@ -378,7 +544,7 @@ function drawPlayer(el, bookTitle, queue, index) {
             <div class="listen-tool-actions">
               <button type="button" class="text-btn" id="listen-restart">처음부터</button>
               <button type="button" class="text-btn" id="listen-next" ${next ? "" : "disabled"}>다음 페이지</button>
-              <button type="button" class="text-btn" id="listen-chapters">챕터 선택</button>
+              <button type="button" class="text-btn" id="listen-chapters">구간 선택</button>
               <button type="button" class="text-btn danger" id="listen-stop">중단</button>
             </div>
           </div>

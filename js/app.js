@@ -7,7 +7,7 @@ import { renderCompare } from "./pages/compare.js?v=20260825c";
 import { renderAdd } from "./pages/add.js?v=20260825c";
 import { renderReview } from "./pages/review.js?v=20260825c";
 import { renderSearch } from "./pages/search.js?v=20260825c";
-import { isListenPlaying, renderListen, stopListenSession } from "./pages/listen.js?v=20260826e";
+import { isListenPlaying, renderListen, stopListenSession } from "./pages/listen.js?v=20260826g";
 import { refreshNowPlaying } from "./ui/nowPlaying.js?v=20260826e";
 import { go, toast, escapeHtml } from "./utils.js?v=20260816p";
 
