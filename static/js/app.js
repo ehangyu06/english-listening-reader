@@ -7,7 +7,7 @@ import { renderCompare } from "./pages/compare.js?v=20260825c";
 import { renderAdd } from "./pages/add.js?v=20260825c";
 import { renderReview } from "./pages/review.js?v=20260825c";
 import { renderSearch } from "./pages/search.js?v=20260825c";
-import { isListenPlaying, renderListen, stopListenSession } from "./pages/listen.js?v=20260826h";
+import { isListenPlaying, renderListen, stopListenSession } from "./pages/listen.js?v=20260826i";
 import { refreshNowPlaying } from "./ui/nowPlaying.js?v=20260826e";
 import { go, toast, escapeHtml } from "./utils.js?v=20260816p";
 
@@ -22,7 +22,7 @@ export async function renderApp(route) {
   const app = document.getElementById("app");
   const actionBar = route.name === "lesson" || route.name === "edit" || route.name === "add";
   const lessonPage = route.name === "lesson";
-  const listenPage = route.name === "listen" || route.name === "listenBook";
+  const listenPage = route.name === "listen" || route.name === "listenBook" || route.name === "listenPart";
   const reviewPage = route.name === "review";
   const searchPage = route.name === "search";
   document.documentElement.classList.toggle("lesson-wide", lessonPage);
@@ -79,7 +79,7 @@ export async function renderApp(route) {
       location.hash = `#/lesson/${encodeURIComponent(route.id)}`;
       return;
     }
-    if (route.name === "listenBook" && isListenPlaying()) {
+    if ((route.name === "listenBook" || route.name === "listenPart") && isListenPlaying()) {
       stopListenSession();
       stopAudio();
       const panel = document.getElementById("content");
@@ -107,7 +107,7 @@ export async function renderApp(route) {
     else if (route.name === "edit") await renderAdd(content, route.id);
     else if (route.name === "review") await renderReview(content);
     else if (route.name === "search") await renderSearch(content);
-    else if (route.name === "listen" || route.name === "listenBook") await renderListen(content, route);
+    else if (route.name === "listen" || route.name === "listenBook" || route.name === "listenPart") await renderListen(content, route);
     else await renderHome(content);
   } catch (error) {
     console.error(error);
@@ -202,6 +202,7 @@ function headerTitle(route) {
   if (route.name === "review") return "복습";
   if (route.name === "search") return "검색";
   if (route.name === "listen") return "연속듣기";
+  if (route.name === "listenPart") return escapeHtml(route.part || route.title || "연속듣기");
   if (route.name === "listenBook") return escapeHtml(route.title || "연속듣기");
   return "English Listening Reader";
 }

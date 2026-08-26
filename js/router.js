@@ -13,6 +13,7 @@ export function parseRoute() {
   if (parts[0] === "lesson" && parts[1]) return { name: "lesson", id: parts[1] };
   if (parts[0] === "review") return { name: "review" };
   if (parts[0] === "search") return { name: "search" };
+  if (parts[0] === "listen" && parts[2]) return { name: "listenPart", title: parts[1], part: parts[2] };
   if (parts[0] === "listen" && parts[1]) return { name: "listenBook", title: parts[1] };
   if (parts[0] === "listen") return { name: "listen" };
   return { name: "home" };

@@ -23,8 +23,19 @@ export function isListenPlaying() {
 export async function renderListen(el, route) {
   playing = false;
   clearPlayLayout(el);
+  if (route?.name === "listenPart") {
+    await renderChapterList(el, route.title, route.part);
+    return;
+  }
   if (route?.name === "listenBook") {
-    await renderChapterList(el, route.title);
+    const title = String(route.title || "").trim();
+    const lessons = await getLessonsByBook(title);
+    const groups = groupListenChapters(lessons);
+    if (usesScriptureGroups(title, groups)) {
+      await renderScriptureBookList(el, title, groups);
+      return;
+    }
+    await renderChapterList(el, title);
     return;
   }
   await renderBookList(el);
@@ -60,7 +71,7 @@ async function renderBookList(el) {
       <div class="section-head">
         <h2>책 선택</h2>
       </div>
-      <p class="hint">책을 고르면 시작 챕터와 끝 챕터를 지정해서 그 구간만 이어서 들을 수 있습니다.</p>
+      <p class="hint">책을 고르세요. Daily Bible은 성경 이름을 먼저 고른 뒤, 장 구간을 지정해서 듣습니다.</p>
       ${
         books.length
           ? `<div class="stack">${books
@@ -82,7 +93,41 @@ async function renderBookList(el) {
   `;
 }
 
-async function renderChapterList(el, bookTitle) {
+async function renderScriptureBookList(el, bookTitle, groups) {
+  clearPlayLayout(el);
+  const title = String(bookTitle || "").trim();
+  const books = scriptureBookGroups(groups);
+  const href = (part) => `#/listen/${encodeURIComponent(title)}/${encodeURIComponent(part)}`;
+
+  el.innerHTML = `
+    <section class="section">
+      <div class="section-head">
+        <h2>${escapeHtml(title)}</h2>
+        <button type="button" class="text-btn" data-go="#/listen">책 다시 선택</button>
+      </div>
+      <p class="hint">들을 성경을 고르세요. 성경을 추가하면 이 목록에 이름이 쌓입니다.</p>
+      ${
+        books.length
+          ? `<div class="stack">${books
+              .map((book) => {
+                const audioPages = book.pages.filter(hasAudio).length;
+                return `
+            <a class="card book-card listen-pick-card" href="${href(book.key)}">
+              <div>
+                <div class="book-title">${escapeHtml(book.key)}</div>
+                <div class="muted">${book.chapters.length}장 · ${book.pages.length} pages${audioPages ? ` · 🎧 ${audioPages}` : " · 오디오 없음"}</div>
+              </div>
+              <span class="listen-pick-go">선택</span>
+            </a>`;
+              })
+              .join("")}</div>`
+          : `<div class="empty">이 책에 재생할 성경이 없습니다.</div>`
+      }
+    </section>
+  `;
+}
+
+async function renderChapterList(el, bookTitle, scripturePart = "") {
   clearPlayLayout(el);
   const title = String(bookTitle || "").trim();
   if (!title) {
@@ -91,20 +136,28 @@ async function renderChapterList(el, bookTitle) {
   }
 
   const lessons = await getLessonsByBook(title);
-  const groups = groupListenChapters(lessons);
-  const scripture = usesScriptureGroups(title, groups);
-  const books = scripture ? scriptureBookGroups(groups) : [];
+  let groups = groupListenChapters(lessons);
+  const part = String(scripturePart || "").trim();
+  if (part) {
+    const book = scriptureBookGroups(groups).find((item) => item.key === part);
+    groups = book?.chapters || [];
+  }
+
+  const heading = part || title;
+  const backHref = part ? `#/listen/${encodeURIComponent(title)}` : "#/listen";
+  const backLabel = part ? "성경 다시 선택" : "책 다시 선택";
+  const numbered = Boolean(part);
 
   el.innerHTML = `
     <section class="section">
       <div class="section-head">
-        <h2>${escapeHtml(title)}</h2>
-        <button type="button" class="text-btn" data-go="#/listen">책 다시 선택</button>
+        <h2>${escapeHtml(heading)}</h2>
+        <button type="button" class="text-btn" data-go="${backHref}">${backLabel}</button>
       </div>
       <p class="hint" id="listen-range-hint">${
-        scripture
-          ? "시작 장을 누른 다음 끝 장을 누르세요. 예: 33을 누르고 35를 누르면 33~35장만 듣습니다."
-          : "시작 챕터를 누른 다음 끝 챕터를 누르세요. 예: 1을 누르고 2를 누르면 1~2장만 듣습니다."
+        numbered
+          ? "시작 장을 누른 다음 끝 장을 누르세요. 장이 많으면 번호를 옆으로 밀어 고르세요."
+          : "시작 챕터를 누른 다음 끝 챕터를 누르세요. 챕터가 많으면 옆으로 밀어 고르세요."
       }</p>
       ${
         groups.length
@@ -114,27 +167,18 @@ async function renderChapterList(el, bookTitle) {
           <div><span class="listen-range-kicker">시작</span><strong id="listen-start-label"></strong></div>
           <div><span class="listen-range-kicker">끝</span><strong id="listen-end-label"></strong></div>
         </div>
-        ${
-          scripture
-            ? books
-                .map(
-                  (book) => `
-        <div class="listen-chip-section">
-          <div class="listen-chip-head">
-            <h3>${escapeHtml(book.key)}</h3>
-            <button type="button" class="text-btn" data-listen-book-start="${escapeHtml(book.startKey)}" data-listen-book-end="${escapeHtml(book.endKey)}">전체 선택</button>
-          </div>
-          <div class="listen-chap-chips">${chapterChipsHtml(book.chapters, true)}</div>
-        </div>`
-                )
-                .join("")
-            : `<div class="listen-chap-chips">${chapterChipsHtml(groups, false)}</div>`
-        }
+        <div class="listen-chip-head">
+          <span class="muted">장 선택</span>
+          <button type="button" class="text-btn" data-listen-book-start="${escapeHtml(groups[0].key)}" data-listen-book-end="${escapeHtml(groups[groups.length - 1].key)}">전체 선택</button>
+        </div>
+        <div class="listen-chap-scroll">
+          <div class="listen-chap-chips">${chapterChipsHtml(groups, numbered)}</div>
+        </div>
         <p class="muted listen-range-summary" id="listen-range-summary"></p>
         <button type="button" class="btn btn-wide" id="listen-range-play">이 구간 듣기</button>
       </div>
       ${
-        scripture
+        numbered
           ? ""
           : `<div class="stack">${groups
               .map((group) => {
@@ -157,7 +201,8 @@ async function renderChapterList(el, bookTitle) {
 
   bindRangeControls(el, title, groups, {
     startKey: groups[0]?.key || "",
-    endKey: scripture && books[0] ? books[0].endKey : groups[0]?.key || "",
+    endKey: groups[0]?.key || "",
+    scripturePart: part,
   });
 }
 
@@ -178,6 +223,7 @@ function bindRangeControls(el, title, groups, initial = {}) {
   const startLabel = el.querySelector("#listen-start-label");
   const endLabel = el.querySelector("#listen-end-label");
   const defaultHint = hint?.textContent || "";
+  const scripturePart = initial.scripturePart || "";
   let startKey = initial.startKey || groups[0]?.key || "";
   let endKey = initial.endKey || startKey;
   let pendingEnd = false;
@@ -210,12 +256,18 @@ function bindRangeControls(el, title, groups, initial = {}) {
     }
   };
 
+  const revealChip = (key) => {
+    const chip = [...el.querySelectorAll("[data-listen-chip]")].find((btn) => btn.getAttribute("data-listen-chip") === key);
+    chip?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+  };
+
   const setRange = (nextStart, nextEnd, { pending = false, play = false } = {}) => {
     startKey = nextStart;
     endKey = nextEnd;
     pendingEnd = pending;
     paint();
-    if (play) startPlayback(el, title, groups, startKey, endKey);
+    revealChip(pending ? startKey : endKey);
+    if (play) startPlayback(el, title, groups, startKey, endKey, scripturePart);
   };
 
   el.querySelectorAll("[data-listen-chip]").forEach((btn) => {
@@ -234,7 +286,7 @@ function bindRangeControls(el, title, groups, initial = {}) {
   });
   playBtn?.addEventListener("click", () => {
     const range = selectedRange();
-    startPlayback(el, title, groups, range.startKey, range.endKey);
+    startPlayback(el, title, groups, range.startKey, range.endKey, scripturePart);
   });
   paint();
 }
@@ -316,16 +368,25 @@ function scriptureBookGroups(groups) {
     }
     map.get(parts.prefix).push(group);
   }
-  return order.map((key) => {
-    const chapters = map.get(key);
-    return {
-      key,
-      startKey: chapters[0].key,
-      endKey: chapters[chapters.length - 1].key,
-      pages: chapters.flatMap((chapter) => chapter.pages),
-      chapters,
-    };
-  });
+  return order
+    .map((key) => {
+      const chapters = map.get(key);
+      return {
+        key,
+        startKey: chapters[0].key,
+        endKey: chapters[chapters.length - 1].key,
+        pages: chapters.flatMap((chapter) => chapter.pages),
+        chapters,
+      };
+    })
+    .sort((a, b) => {
+      const latest = (book) =>
+        book.pages.reduce((max, page) => {
+          const time = String(page.updatedAt || page.createdAt || "");
+          return time > max ? time : max;
+        }, "");
+      return latest(b).localeCompare(latest(a));
+    });
 }
 
 function orderedRange(groups, startKey, endKey) {
@@ -346,7 +407,7 @@ function orderedRange(groups, startKey, endKey) {
   };
 }
 
-function startPlayback(el, bookTitle, groups, startKey, endKey) {
+function startPlayback(el, bookTitle, groups, startKey, endKey, scripturePart = "") {
   const range = orderedRange(groups, startKey, endKey);
   const queue = range.queue;
   if (!queue.length) {
@@ -411,7 +472,7 @@ function startPlayback(el, bookTitle, groups, startKey, endKey) {
       playing = false;
       stopAudio();
       toast("선택한 구간을 끝까지 들었습니다.");
-      await renderChapterList(el, bookTitle);
+      await renderChapterList(el, bookTitle, scripturePart);
       return;
     }
     index = nextIndex;
@@ -470,13 +531,13 @@ function startPlayback(el, bookTitle, groups, startKey, endKey) {
       stopListenSession();
       stopAudio();
       toast("연속듣기를 멈췄습니다.");
-      await renderChapterList(el, bookTitle);
+      await renderChapterList(el, bookTitle, scripturePart);
     });
     el.querySelector("#listen-chapters")?.addEventListener("click", async () => {
       if (mySession !== sessionId) return;
       stopListenSession();
       stopAudio();
-      await renderChapterList(el, bookTitle);
+      await renderChapterList(el, bookTitle, scripturePart);
     });
     const seek = el.querySelector("#listen-seek");
     const currentEl = el.querySelector("#listen-current");

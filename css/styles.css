@@ -2235,13 +2235,24 @@ a.listen-pick-card {
   font-size: 16px;
 }
 
+.listen-chap-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  margin: 0 -16px;
+  padding: 4px 16px 10px;
+}
+
 .listen-chap-chips {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px;
+  width: max-content;
 }
 
 .listen-chap-chip {
+  flex: 0 0 auto;
   min-width: 48px;
   min-height: 44px;
   padding: 8px 12px;
