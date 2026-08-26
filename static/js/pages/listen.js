@@ -111,8 +111,8 @@ async function renderChapterList(el, bookTitle) {
           ? `
       <div class="card listen-range-card">
         <div class="listen-range-picked">
-          <div><span class="muted">시작</span><strong id="listen-start-label"></strong></div>
-          <div><span class="muted">끝</span><strong id="listen-end-label"></strong></div>
+          <div><span class="listen-range-kicker">시작</span><strong id="listen-start-label"></strong></div>
+          <div><span class="listen-range-kicker">끝</span><strong id="listen-end-label"></strong></div>
         </div>
         ${
           scripture

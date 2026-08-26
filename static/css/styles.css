@@ -2200,17 +2200,21 @@ a.listen-pick-card {
 }
 
 .listen-range-picked > div {
-  display: grid;
-  gap: 4px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
 }
 
-.listen-range-picked .muted {
-  font-size: 12px;
+.listen-range-kicker {
+  flex-shrink: 0;
+  color: var(--accent);
+  font-size: 16px;
   font-weight: 800;
 }
 
 .listen-range-picked strong {
   font-size: 16px;
+  font-weight: 800;
   line-height: 1.3;
 }
 
