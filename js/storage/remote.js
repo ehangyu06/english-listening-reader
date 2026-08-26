@@ -1,4 +1,4 @@
-import { getCloudConfig } from "../config.js?v=20260826a";
+import { getCloudConfig } from "../config.js?v=20260827i";
 import {
   cloudBlobExists,
   cloudDeleteBlob,
@@ -10,7 +10,7 @@ import {
   cloudPutLesson,
   cloudPutSetting,
   isCloudEnabled,
-} from "./cloud.js?v=20260826a";
+} from "./cloud.js?v=20260827i";
 
 export function useMacRemote() {
   const host = location.hostname || "";

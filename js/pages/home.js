@@ -1,8 +1,8 @@
 import { getAllLessons, hasAudio } from "../storage/lessons.js?v=20260825c";
 import { getSetting } from "../storage/db.js?v=20260825c";
-import { remoteStatus, persistCloudToMac, macCloudPushStatus } from "../storage/remote.js?v=20260826c";
-import { isCloudEnabled } from "../storage/cloud.js?v=20260826a";
-import { clearCloudConfig, getCloudConfig, saveCloudConfig } from "../config.js?v=20260826a";
+import { remoteStatus, persistCloudToMac, macCloudPushStatus } from "../storage/remote.js?v=20260827i";
+import { isCloudEnabled } from "../storage/cloud.js?v=20260827i";
+import { clearCloudConfig, getCloudConfig, saveCloudConfig } from "../config.js?v=20260827i";
 import { scriptPreviewLines } from "../services/parser.js?v=20260816p";
 import { escapeHtml, formatDate, toast } from "../utils.js?v=20260816p";
 
@@ -196,41 +196,32 @@ async function renderIpadGuide(mount) {
   const onPages = host.endsWith("github.io");
   if (onPages) return;
 
-  let lanUrl = "";
-  let bonjourUrl = "";
-  try {
-    const res = await fetch("/__lan.json", { cache: "no-store" });
-    if (res.ok) {
-      const data = await res.json();
-      bonjourUrl = data.bonjourUrl || "";
-      lanUrl = data.url || "";
-    }
-  } catch {
-    lanUrl = "";
-  }
-
   const qr = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(PAGES_URL)}`;
-  const extra = [bonjourUrl, lanUrl]
-    .filter(Boolean)
-    .map((value) => value.replace(/^https?:\/\//, ""))
-    .join(" · ");
   mount.innerHTML = `
     <section class="card ipad-card">
       <div class="ipad-card-top">
         <div>
           <div class="block-title">아이패드·휴대폰에서 보기</div>
-          <p class="hint">맥을 꺼도 되는 주소입니다. 사파리에 넣고 홈 화면에 추가하세요.</p>
+          <p class="hint">맥을 끄면 지금 이 화면은 열리지 않습니다. 아이패드·아이폰은 아래 주소만 사파리에 넣고, 예전 홈 화면 아이콘은 지운 뒤 다시 추가하세요.</p>
         </div>
         <button type="button" class="text-btn" id="hide-ipad-guide">안내 닫기</button>
       </div>
       <div class="ipad-url">${escapeHtml(PAGES_URL.replace(/^https?:\/\//, ""))}</div>
-      ${extra ? `<p class="muted">맥이 켜져 있고 같은 Wi-Fi일 때만: ${escapeHtml(extra)}</p>` : ""}
+      <button type="button" class="btn btn-play" id="copy-pages-url">주소 복사</button>
       <img class="ipad-qr" src="${qr}" alt="아이패드 접속 QR">
     </section>
   `;
   mount.querySelector("#hide-ipad-guide")?.addEventListener("click", () => {
     sessionStorage.setItem("hideIpadGuide", "1");
     mount.innerHTML = "";
+  });
+  mount.querySelector("#copy-pages-url")?.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(PAGES_URL);
+      toast("주소를 복사했습니다. 아이패드 사파리에 붙여 넣으세요.");
+    } catch {
+      toast(PAGES_URL);
+    }
   });
 }
 

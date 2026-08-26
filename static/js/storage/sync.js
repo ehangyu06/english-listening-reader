@@ -9,7 +9,7 @@ import {
   persistCloudToMac,
   ensureRemoteBlob,
   useMacRemote,
-} from "./remote.js?v=20260826c";
+} from "./remote.js?v=20260827i";
 
 function newer(a, b) {
   return String(a?.updatedAt || "") >= String(b?.updatedAt || "");

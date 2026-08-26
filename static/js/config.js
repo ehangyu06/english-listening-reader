@@ -7,8 +7,8 @@
 //    홈 화면의 클라우드 연결 칸에 붙여넣거나, 아래에 직접 넣기
 // 3) 집 맥에서 이 앱을 한 번 열면 기존 학습자료가 클라우드로 올라갑니다
 export const CLOUD = {
-  supabaseUrl: "",
-  supabaseAnonKey: "",
+  supabaseUrl: "https://fecabexqgxcgiwqqwamx.supabase.co",
+  supabaseAnonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZlY2FiZXhxZ3hjZ2l3cXF3YW14Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI4MDE1NzMsImV4cCI6MjA5ODM3NzU3M30.JhFLNxaohz-GT-oBrchRF6eyrNbmhSP0lnMMpDR7Rvc",
 };
 
 export const CLOUD_STORAGE_KEY = "listening-cloud";
@@ -47,13 +47,23 @@ function readHashCloud() {
   return null;
 }
 
+function hasCloud(value) {
+  return Boolean(String(value?.supabaseUrl || "").trim() && String(value?.supabaseAnonKey || "").trim());
+}
+
 export function getCloudConfig() {
   const fromHash = readHashCloud();
   if (fromHash) return fromHash;
   const injected = typeof window !== "undefined" ? window.__LISTENING_CLOUD__ : null;
-  if (injected?.supabaseUrl && injected?.supabaseAnonKey) return injected;
+  if (hasCloud(injected)) {
+    saveCloudConfig(injected);
+    return injected;
+  }
   const saved = readSavedCloud();
   if (saved) return saved;
+  if (hasCloud(CLOUD) && typeof window !== "undefined") {
+    saveCloudConfig(CLOUD);
+  }
   return CLOUD;
 }
 

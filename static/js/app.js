@@ -1,6 +1,6 @@
 import { stopAudio, getNowPlaying } from "./services/audioPlayer.js?v=20260827d";
 import { closeLightbox, isLightboxOpen } from "./pages/lightbox.js?v=20260816w";
-import { renderHome } from "./pages/home.js?v=20260827h";
+import { renderHome } from "./pages/home.js?v=20260827i";
 import { renderBooks, renderBookDetail } from "./pages/books.js?v=20260826c";
 import { renderLesson } from "./pages/lesson.js?v=20260827d";
 import { renderCompare } from "./pages/compare.js?v=20260825c";
