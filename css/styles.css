@@ -378,6 +378,11 @@ a.card {
   width: 100%;
 }
 
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .btn-primary {
   background: var(--accent);
 }
@@ -2297,34 +2302,15 @@ a.listen-pick-card {
   padding: 16px;
 }
 
-.listen-range-picked {
+.listen-chip-section {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 6px;
 }
 
-.listen-range-picked > div {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-}
-
-.listen-range-kicker {
-  flex-shrink: 0;
+.listen-chip-row-label {
   color: var(--accent);
   font-size: 16px;
   font-weight: 800;
-}
-
-.listen-range-picked strong {
-  font-size: 16px;
-  font-weight: 800;
-  line-height: 1.3;
-}
-
-.listen-chip-section {
-  display: grid;
-  gap: 8px;
 }
 
 .listen-chip-head {
@@ -2378,6 +2364,14 @@ a.listen-pick-card {
   background: var(--accent);
   border-color: var(--accent);
   color: #f7f4ee;
+}
+
+.listen-chap-chip:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  background: var(--bg-2);
+  border-color: var(--line);
+  color: var(--muted);
 }
 
 .listen-range-summary {

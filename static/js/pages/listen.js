@@ -175,23 +175,28 @@ async function renderChapterList(el, bookTitle, scripturePart = "") {
       </div>
       <p class="hint" id="listen-range-hint">${
         numbered
-          ? "시작 장을 누른 다음 끝 장을 누르세요. 장이 많으면 번호를 옆으로 밀어 고르세요."
-          : "시작 챕터를 누른 다음 끝 챕터를 누르세요. 챕터가 많으면 옆으로 밀어 고르세요."
+          ? "윗칸에서 시작 장을, 아랫칸에서 끝 장을 고르세요. 시작보다 앞 장은 고를 수 없습니다."
+          : "윗칸에서 시작 챕터를, 아랫칸에서 끝 챕터를 고르세요. 시작보다 앞 챕터는 고를 수 없습니다."
       }</p>
       ${
         groups.length
           ? `
       <div class="card listen-range-card">
-        <div class="listen-range-picked">
-          <div><span class="listen-range-kicker">시작</span><strong id="listen-start-label"></strong></div>
-          <div><span class="listen-range-kicker">끝</span><strong id="listen-end-label"></strong></div>
-        </div>
         <div class="listen-chip-head">
-          <span class="muted">장 선택</span>
+          <span class="muted">${numbered ? "장 선택" : "챕터 선택"}</span>
           <button type="button" class="text-btn" data-listen-book-start="${escapeHtml(groups[0].key)}" data-listen-book-end="${escapeHtml(groups[groups.length - 1].key)}">전체 선택</button>
         </div>
-        <div class="listen-chap-scroll">
-          <div class="listen-chap-chips">${chapterChipsHtml(groups, numbered)}</div>
+        <div class="listen-chip-section">
+          <div class="listen-chip-row-label">시작</div>
+          <div class="listen-chap-scroll" data-listen-start-scroll>
+            <div class="listen-chap-chips">${chapterChipsHtml(groups, numbered, "start")}</div>
+          </div>
+        </div>
+        <div class="listen-chip-section">
+          <div class="listen-chip-row-label">끝</div>
+          <div class="listen-chap-scroll" data-listen-end-scroll>
+            <div class="listen-chap-chips">${chapterChipsHtml(groups, numbered, "end")}</div>
+          </div>
         </div>
         <p class="muted listen-range-summary" id="listen-range-summary"></p>
         <button type="button" class="btn btn-wide" id="listen-range-play">이 구간 듣기</button>
@@ -219,10 +224,10 @@ async function renderChapterList(el, bookTitle, scripturePart = "") {
   `;
 
   const draft = rangeDraftMatches(title, part);
+  const initial = clampRangeKeys(groups, draft?.startKey || groups[0]?.key || "", draft?.endKey || draft?.startKey || groups[0]?.key || "");
   bindRangeControls(el, title, groups, {
-    startKey: draft?.startKey || groups[0]?.key || "",
-    endKey: draft?.endKey || draft?.startKey || groups[0]?.key || "",
-    pendingEnd: Boolean(draft?.pendingEnd),
+    startKey: initial.startKey,
+    endKey: initial.endKey,
     scripturePart: part,
   });
 }
@@ -232,53 +237,93 @@ function rangeDraftMatches(title, part) {
   return rangeDraft?.key === key ? rangeDraft : null;
 }
 
-function saveRangeDraft(title, part, startKey, endKey, pendingEnd) {
+function saveRangeDraft(title, part, startKey, endKey) {
   rangeDraft = {
     key: `${title}\0${part || ""}`,
     startKey,
     endKey,
-    pendingEnd: Boolean(pendingEnd),
   };
 }
 
-function chapterChipsHtml(groups, numbered) {
+function chapterChipsHtml(groups, numbered, role) {
+  const attr = role === "end" ? "data-listen-chip-end" : "data-listen-chip-start";
+  const roleLabel = role === "end" ? "끝" : "시작";
   return groups
     .map((group) => {
       const parts = parseChapterName(group.key);
       const label = numbered && parts.number != null ? String(parts.number) : group.key;
-      return `<button type="button" class="listen-chap-chip" data-listen-chip="${escapeHtml(group.key)}" aria-label="${escapeHtml(group.key)}">${escapeHtml(label)}</button>`;
+      return `<button type="button" class="listen-chap-chip" ${attr}="${escapeHtml(group.key)}" aria-label="${escapeHtml(`${roleLabel} ${group.key}`)}">${escapeHtml(label)}</button>`;
     })
     .join("");
+}
+
+function clampRangeKeys(groups, startKey, endKey) {
+  const startIdx = groups.findIndex((group) => group.key === startKey);
+  const start = startIdx >= 0 ? startKey : groups[0]?.key || "";
+  const startIndex = groups.findIndex((group) => group.key === start);
+  const endIdx = groups.findIndex((group) => group.key === endKey);
+  const end = endIdx >= 0 && startIndex >= 0 && endIdx >= startIndex ? endKey : start;
+  return { startKey: start, endKey: end };
+}
+
+function bindSyncedScroll(first, second) {
+  if (!first || !second) return;
+  let lock = false;
+  const sync = (from, to) => {
+    from.addEventListener(
+      "scroll",
+      () => {
+        if (lock) return;
+        lock = true;
+        to.scrollLeft = from.scrollLeft;
+        lock = false;
+      },
+      { passive: true }
+    );
+  };
+  sync(first, second);
+  sync(second, first);
 }
 
 function bindRangeControls(el, title, groups, initial = {}) {
   const summary = el.querySelector("#listen-range-summary");
   const playBtn = el.querySelector("#listen-range-play");
-  const hint = el.querySelector("#listen-range-hint");
-  const startLabel = el.querySelector("#listen-start-label");
-  const endLabel = el.querySelector("#listen-end-label");
-  const defaultHint = hint?.textContent || "";
   const scripturePart = initial.scripturePart || "";
-  let startKey = initial.startKey || groups[0]?.key || "";
-  let endKey = initial.endKey || startKey;
-  let pendingEnd = Boolean(initial.pendingEnd);
+  const first = clampRangeKeys(groups, initial.startKey, initial.endKey);
+  let startKey = first.startKey;
+  let endKey = first.endKey;
 
   const selectedRange = () => orderedRange(groups, startKey, endKey);
 
-  const paint = () => {
+  const paintChips = (selector, attr, { selectedKey, selectedClass, disableBeforeStart = false }) => {
     const range = selectedRange();
     const startIdx = groups.findIndex((group) => group.key === range.startKey);
     const endIdx = groups.findIndex((group) => group.key === range.endKey);
-    el.querySelectorAll("[data-listen-chip]").forEach((btn) => {
-      const key = btn.getAttribute("data-listen-chip") || "";
+    el.querySelectorAll(selector).forEach((btn) => {
+      const key = btn.getAttribute(attr) || "";
       const idx = groups.findIndex((group) => group.key === key);
-      const inRange = startIdx >= 0 && idx >= startIdx && idx <= endIdx;
+      const disabled = disableBeforeStart && startIdx >= 0 && idx < startIdx;
+      const selected = !disabled && key === selectedKey;
+      const inRange = !disabled && startIdx >= 0 && idx >= startIdx && idx <= endIdx;
+      btn.disabled = disabled;
       btn.classList.toggle("is-in-range", inRange);
-      btn.classList.toggle("is-start", key === range.startKey);
-      btn.classList.toggle("is-end", key === range.endKey);
+      btn.classList.toggle("is-start", selectedClass === "is-start" && selected);
+      btn.classList.toggle("is-end", selectedClass === "is-end" && selected);
+      btn.setAttribute("aria-pressed", selected ? "true" : "false");
     });
-    if (startLabel) startLabel.textContent = range.startKey || "-";
-    if (endLabel) endLabel.textContent = range.endKey || "-";
+  };
+
+  const paint = () => {
+    const range = selectedRange();
+    paintChips("[data-listen-chip-start]", "data-listen-chip-start", {
+      selectedKey: range.startKey,
+      selectedClass: "is-start",
+    });
+    paintChips("[data-listen-chip-end]", "data-listen-chip-end", {
+      selectedKey: range.endKey,
+      selectedClass: "is-end",
+      disableBeforeStart: true,
+    });
     if (summary) {
       const label = range.startKey && range.startKey === range.endKey ? range.startKey : `${range.startKey} – ${range.endKey}`;
       summary.textContent = range.queue.length
@@ -286,46 +331,53 @@ function bindRangeControls(el, title, groups, initial = {}) {
         : "이 구간에 오디오가 없습니다.";
     }
     if (playBtn) playBtn.disabled = !range.queue.length;
-    if (hint) {
-      hint.textContent = pendingEnd ? "끝 장을 눌러 주세요." : defaultHint;
-    }
   };
 
   const revealChip = (key) => {
-    const chip = [...el.querySelectorAll("[data-listen-chip]")].find((btn) => btn.getAttribute("data-listen-chip") === key);
+    const chip = [...el.querySelectorAll("[data-listen-chip-start]")].find((btn) => btn.getAttribute("data-listen-chip-start") === key);
     chip?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
   };
 
-  const setRange = (nextStart, nextEnd, { pending = false, play = false } = {}) => {
-    startKey = nextStart;
-    endKey = nextEnd;
-    pendingEnd = pending;
-    saveRangeDraft(title, scripturePart, startKey, endKey, pendingEnd);
+  const setRange = (nextStart, nextEnd, { play = false, reveal = "" } = {}) => {
+    const next = clampRangeKeys(groups, nextStart, nextEnd);
+    startKey = next.startKey;
+    endKey = next.endKey;
+    saveRangeDraft(title, scripturePart, startKey, endKey);
     paint();
-    revealChip(pending ? startKey : endKey);
+    if (reveal) revealChip(reveal);
     if (play) startPlayback(el, title, groups, startKey, endKey, scripturePart);
   };
 
-  el.querySelectorAll("[data-listen-chip]").forEach((btn) => {
+  el.querySelectorAll("[data-listen-chip-start]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const key = btn.getAttribute("data-listen-chip") || "";
-      if (!pendingEnd) setRange(key, key, { pending: true });
-      else setRange(startKey, key, { pending: false });
+      const key = btn.getAttribute("data-listen-chip-start") || "";
+      setRange(key, endKey, { reveal: key });
+    });
+  });
+  el.querySelectorAll("[data-listen-chip-end]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (btn.disabled) return;
+      const key = btn.getAttribute("data-listen-chip-end") || "";
+      setRange(startKey, key, { reveal: key });
     });
   });
   el.querySelectorAll("[data-listen-book-start]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const nextStart = btn.getAttribute("data-listen-book-start") || "";
       const nextEnd = btn.getAttribute("data-listen-book-end") || nextStart;
-      setRange(nextStart, nextEnd, { play: btn.hasAttribute("data-listen-play-now") });
+      setRange(nextStart, nextEnd, {
+        play: btn.hasAttribute("data-listen-play-now"),
+        reveal: btn.hasAttribute("data-listen-play-now") ? "" : nextStart,
+      });
     });
   });
   playBtn?.addEventListener("click", () => {
     const range = selectedRange();
-    saveRangeDraft(title, scripturePart, range.startKey, range.endKey, false);
+    saveRangeDraft(title, scripturePart, range.startKey, range.endKey);
     startPlayback(el, title, groups, range.startKey, range.endKey, scripturePart);
   });
-  saveRangeDraft(title, scripturePart, startKey, endKey, pendingEnd);
+  bindSyncedScroll(el.querySelector("[data-listen-start-scroll]"), el.querySelector("[data-listen-end-scroll]"));
+  saveRangeDraft(title, scripturePart, startKey, endKey);
   paint();
 }
 
