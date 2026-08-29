@@ -1,9 +1,9 @@
 import { stopAudio, getNowPlaying } from "./services/audioPlayer.js?v=20260827d";
 import { closeLightbox, isLightboxOpen } from "./pages/lightbox.js?v=20260816w";
-import { renderHome } from "./pages/home.js?v=20260828a";
+import { renderHome } from "./pages/home.js?v=20260829b";
 import { renderBooks, renderBookDetail } from "./pages/books.js?v=20260826c";
 import { renderLesson } from "./pages/lesson.js?v=20260827d";
-import { renderCompare } from "./pages/compare.js?v=20260825c";
+import { renderCompare } from "./pages/compare.js?v=20260829b";
 import { renderAdd } from "./pages/add.js?v=20260825c";
 import { renderReview } from "./pages/review.js?v=20260825c";
 import { renderSearch } from "./pages/search.js?v=20260825c";

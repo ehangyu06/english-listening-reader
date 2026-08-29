@@ -1583,6 +1583,11 @@ html.compare-lock #app {
   color: var(--muted);
 }
 
+.compare-line-note strong {
+  font-weight: 700;
+  color: #5f5a54;
+}
+
 .compare-editor {
   flex: 1;
   width: 100%;

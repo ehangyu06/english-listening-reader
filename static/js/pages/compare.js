@@ -1,6 +1,6 @@
 import { getLesson, saveLesson, getLessonImageIds } from "../storage/lessons.js?v=20260825c";
 import { getImage } from "../storage/images.js?v=20260825c";
-import { parseScriptParts, parseLiteralTranslation, scriptPartKindLabel, scriptForCopy, serializePairList, normalizeExpressions } from "../services/parser.js?v=20260825b";
+import { parseScriptParts, parseLiteralTranslation, scriptPartKindLabel, scriptForCopy, serializePairList, normalizeExpressions } from "../services/parser.js?v=20260829b";
 import { copyText, escapeHtml, nl2br, toast } from "../utils.js?v=20260816q";
 import { renderPenText } from "../ui/penHighlight.js?v=20260823n";
 
@@ -23,6 +23,8 @@ export async function renderCompare(el, id) {
   lesson.expressions = normalizeExpressions(lesson.expressions || []);
 
   const text = lesson.literalTranslationKo || "";
+  const koHtml = koreanBody(text);
+  const koStructured = /compare-part/.test(koHtml);
   el.innerHTML = `
     <div class="compare-view">
       <section class="compare-photo" aria-label="원본 페이지">
@@ -43,8 +45,8 @@ export async function renderCompare(el, id) {
           <h2 id="compare-title">한글 직역</h2>
         </div>
         <p class="hint" id="compare-hint">메인 화면의 한글 직역과 같은 내용입니다. 여기서 수정하면 메인 화면에도 반영됩니다.</p>
-        <div class="compare-ko-body" id="compare-body">
-          ${koreanBody(text)}
+        <div class="compare-ko-body${koStructured ? " is-script" : ""}" id="compare-body">
+          ${koHtml}
         </div>
         <div class="compare-actions">
           <div class="compare-actions-main" id="compare-ko-actions">
@@ -248,10 +250,10 @@ function translationScenesBody(text) {
           const speaker = line.speaker
             ? `<span class="compare-speaker">${escapeHtml(line.speaker)}:</span> `
             : "";
-          const en = line.en ? `<div class="compare-line-en">${speaker}${escapeHtml(line.en)}</div>` : "";
-          const ko = line.literal ? `<div class="compare-line-ko">${escapeHtml(line.literal)}</div>` : "";
+          const en = line.en ? `<div class="compare-line-en">${speaker}${formatCompareInline(line.en)}</div>` : "";
+          const ko = line.literal ? `<div class="compare-line-ko">${formatCompareInline(line.literal)}</div>` : "";
           const note = line.idiomatic
-            ? `<div class="compare-line-note">${escapeHtml(line.idiomatic)}</div>`
+            ? `<div class="compare-line-note">${formatCompareInline(line.idiomatic)}</div>`
             : "";
           return `<div class="compare-line">${en}${ko}${note}</div>`;
         })
@@ -265,6 +267,10 @@ function translationScenesBody(text) {
       `;
     })
     .join("");
+}
+
+function formatCompareInline(text) {
+  return escapeHtml(text).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
 }
 
 function partHeading(part) {

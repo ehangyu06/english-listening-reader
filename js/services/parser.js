@@ -785,46 +785,159 @@ export function scriptPartKindLabel(part) {
 
 const TRANSLATION_NOTE_RE = /^(?:\*+\s*)?(직역|의역(?:\s*\/\s*숨은 뜻)?|숨은 뜻)\s*[:：]\s*(.*)$/i;
 const TRANSLATION_SPEAKER_RE =
-  /^(?:\*+\s*)?([A-Za-z][A-Za-z0-9 .\/'-]{0,40}|[가-힣]{1,16}(?:\s+[가-힣]{1,16})?)\s*:\s+(.*)$/;
+  /^(?:\*+\s*)?([A-Za-z][A-Za-z0-9 .\/'\u2018\u2019-]{0,40}|[가-힣]{1,16}(?:\s+[가-힣]{1,16})?)\s*[:：]\s+(.*)$/;
+const ARROW_NOTE_RE = /^(?:\(\s*)?(?:→|->|⇒|➜)\s+(\S[\s\S]*)$/;
+const INLINE_ARROW_NOTE_RE = /^(.*?)\s*\(\s*(?:→|->|⇒|➜)\s+([\s\S]+)$/;
+
+function normalizeDialogueLine(raw) {
+  let line = String(raw || "").trim();
+  if (!line) return "";
+  line = line.replace(/^(?:[-*•◦○∙·]|\d+[.)])\s+/, "").trim();
+  const wrapped = line.match(/^\*\*(.+?)\*\*(.*)$/);
+  if (wrapped) line = `${wrapped[1]}${wrapped[2]}`.trim();
+  return line;
+}
+
+function isTranslationDocHeading(line) {
+  const plain = String(line || "").replace(/\*\*/g, "").trim();
+  return /^\d+\.\s*.*(직역|의역|번역|translation|hidden meaning)/i.test(plain);
+}
+
+function isRuleLine(line) {
+  return line === "⸻" || /^(?:[-*_]){3,}$/.test(line);
+}
+
+function unwrapArrowNote(value) {
+  return String(value || "")
+    .replace(/^\(\s*/, "")
+    .replace(/^(?:→|->|⇒|➜)\s+/, "")
+    .replace(/\)\s*$/, "")
+    .trim();
+}
+
+function closePendingNote(buffer) {
+  const closed = String(buffer || "").includes(")");
+  return {
+    closed,
+    text: unwrapArrowNote(buffer),
+  };
+}
+
+function attachTranslationNote(current, value, literal) {
+  const note = String(value || "").trim();
+  if (!note) return current;
+  if (literal) {
+    current.literal = current.literal ? `${current.literal} ${note}` : note;
+  } else {
+    current.idiomatic = current.idiomatic ? `${current.idiomatic} ${note}` : note;
+  }
+  return current;
+}
+
+function ensureDialogueLine(lines, current) {
+  if (current) return current;
+  const created = { speaker: "", en: "", literal: "", idiomatic: "" };
+  lines.push(created);
+  return created;
+}
 
 function parseDialogueLines(text) {
   const lines = [];
   let current = null;
-  for (const raw of String(text || "").split(/\r?\n/)) {
-    const trimmed = raw.trim();
-    if (!trimmed || trimmed === "⸻") continue;
-    const note = trimmed.match(TRANSLATION_NOTE_RE);
-    if (note) {
-      if (!current) {
-        current = { speaker: "", en: "", literal: "", idiomatic: "" };
-        lines.push(current);
-      }
-      const value = String(note[2] || "").trim();
-      if (String(note[1] || "").startsWith("직역")) {
-        current.literal = current.literal ? `${current.literal} ${value}` : value;
-      } else {
-        current.idiomatic = current.idiomatic ? `${current.idiomatic} ${value}` : value;
+  let pendingNote = "";
+  const rawLines = String(text || "").split(/\r?\n/);
+
+  const finishPending = () => {
+    if (!pendingNote) return;
+    const { text: note } = closePendingNote(pendingNote);
+    current = attachTranslationNote(ensureDialogueLine(lines, current), note, false);
+    pendingNote = "";
+  };
+
+  for (const raw of rawLines) {
+    const trimmed = String(raw || "").trim();
+    if (pendingNote) {
+      pendingNote = `${pendingNote} ${trimmed}`.trim();
+      const { closed, text: note } = closePendingNote(pendingNote);
+      if (closed) {
+        current = attachTranslationNote(ensureDialogueLine(lines, current), note, false);
+        pendingNote = "";
       }
       continue;
     }
-    const spoken = trimmed.replace(/^\*+\s*/, "").match(TRANSLATION_SPEAKER_RE);
+    if (!trimmed || isRuleLine(trimmed)) continue;
+
+    const normalized = normalizeDialogueLine(trimmed);
+    if (!normalized || isTranslationDocHeading(normalized)) continue;
+
+    const labeled = normalized.match(TRANSLATION_NOTE_RE);
+    if (labeled) {
+      current = attachTranslationNote(
+        ensureDialogueLine(lines, current),
+        labeled[2],
+        String(labeled[1] || "").startsWith("직역")
+      );
+      continue;
+    }
+
+    const arrow = normalized.match(ARROW_NOTE_RE);
+    if (arrow) {
+      if (normalized.startsWith("(") && !normalized.includes(")")) {
+        pendingNote = normalized;
+        continue;
+      }
+      current = attachTranslationNote(ensureDialogueLine(lines, current), unwrapArrowNote(normalized), false);
+      continue;
+    }
+
+    const spoken = normalized.match(TRANSLATION_SPEAKER_RE);
     if (spoken) {
       current = {
-        speaker: spoken[1].trim(),
-        en: spoken[2].trim(),
+        speaker: spoken[1].replace(/\*+/g, "").trim(),
+        en: String(spoken[2] || "").trim(),
         literal: "",
         idiomatic: "",
       };
+      const inline = current.en.match(INLINE_ARROW_NOTE_RE);
+      if (inline && inline[1].trim()) {
+        current.en = inline[1].trim();
+        const rest = String(inline[2] || "").trim();
+        if (rest.includes(")") || !normalized.includes("(")) {
+          current.idiomatic = unwrapArrowNote(rest);
+        } else {
+          pendingNote = `(→ ${rest}`;
+        }
+      }
       lines.push(current);
       continue;
     }
+
+    const inline = normalized.match(INLINE_ARROW_NOTE_RE);
+    if (inline && inline[1].trim()) {
+      const dialogue = inline[1].trim();
+      const rest = String(inline[2] || "").trim();
+      if (current && !current.literal && !current.idiomatic) {
+        current.en = current.en ? `${current.en} ${dialogue}` : dialogue;
+      } else {
+        current = { speaker: "", en: dialogue, literal: "", idiomatic: "" };
+        lines.push(current);
+      }
+      if (rest.includes(")") || !normalized.includes("(")) {
+        current = attachTranslationNote(current, unwrapArrowNote(rest), false);
+      } else {
+        pendingNote = `(→ ${rest}`;
+      }
+      continue;
+    }
+
     if (current && !current.literal && !current.idiomatic) {
-      current.en = current.en ? `${current.en} ${trimmed}` : trimmed;
+      current.en = current.en ? `${current.en} ${normalized}` : normalized;
     } else {
-      current = { speaker: "", en: trimmed, literal: "", idiomatic: "" };
+      current = { speaker: "", en: normalized, literal: "", idiomatic: "" };
       lines.push(current);
     }
   }
+  finishPending();
   return lines;
 }
 
