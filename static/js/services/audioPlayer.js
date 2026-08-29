@@ -97,10 +97,40 @@ export function swapAudio(blob) {
   return audioEl;
 }
 
+export function audioIsPlayable(el = audioEl) {
+  return Boolean(el && el.getAttribute("src") && !el.error);
+}
+
+export async function playAudio(el = audioEl) {
+  const target = el || audioEl;
+  if (!target) throw new Error("no audio");
+  rewindIfFinished(target);
+  try {
+    await target.play();
+  } catch {
+    rewindIfFinished(target, true);
+    await target.play();
+  }
+}
+
 export function toggleAudio() {
   if (!audioEl) return;
-  if (audioEl.paused) audioEl.play().catch(() => {});
+  if (audioEl.paused) playAudio(audioEl).catch(() => {});
   else audioEl.pause();
+}
+
+function rewindIfFinished(el, force = false) {
+  const duration = Number(el.duration);
+  const finished =
+    force ||
+    el.ended ||
+    (Number.isFinite(duration) && duration > 0 && el.currentTime >= duration - 0.25);
+  if (!finished) return;
+  try {
+    el.currentTime = 0;
+  } catch {
+    /* ignore */
+  }
 }
 
 export function skipAudio(seconds) {
@@ -126,8 +156,12 @@ function wireAudio(el) {
   el.addEventListener("play", notify);
   el.addEventListener("pause", notify);
   el.addEventListener("ended", () => {
-    if (el.loop || el._keepAliveOnEnded) return;
-    stopAudio();
+    if (el.loop || el._keepAliveOnEnded) {
+      notify();
+      return;
+    }
+    rewindIfFinished(el, true);
+    notify();
   });
 }
 

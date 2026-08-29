@@ -1,7 +1,7 @@
 import { uid, escapeHtml, formatTime, formatBytes, toast } from "../utils.js?v=20260816p";
 import { saveLesson, getFullAudioTrack } from "../storage/lessons.js?v=20260825c";
 import { saveAudio, getAudio, deleteAudio, readAudioDuration, isAudioFile, MAX_AUDIO_BYTES, audioFileInputAttrs } from "../storage/audio.js?v=20260825c";
-import { attachAudio, stopAudio, getAudioElement, isLessonPlaying, setNowPlaying } from "../services/audioPlayer.js?v=20260827d";
+import { attachAudio, stopAudio, getAudioElement, isLessonPlaying, setNowPlaying, playAudio, audioIsPlayable } from "../services/audioPlayer.js?v=20260829c";
 
 const SPEEDS = [0.8, 0.9, 1.0, 1.1, 1.2];
 const SHEET_COLLAPSED_KEY = "elr-audio-sheet-collapsed";
@@ -354,11 +354,38 @@ export async function bindAudioPanel(root, lesson) {
     audio.onpause = paint;
     audio.onended = paint;
 
-    playBtn.addEventListener("click", () => {
-      if (audio.paused) {
+    const startPlayback = async ({ fromStart = false } = {}) => {
+      markPlaying(track);
+      let current = getAudioElement();
+      if (!audioIsPlayable(current)) {
+        const record = await getAudio(track.audioId);
+        if (!record?.blob) throw new Error("missing audio");
+        const rate =
+          Number(mount.querySelector("[data-audio-rate].is-active")?.dataset.audioRate) ||
+          audio.playbackRate ||
+          1;
+        current = attachAudio(record.blob);
+        current.playbackRate = rate;
+        current.loop = loopOn;
+        mount.innerHTML = playerMarkup(track);
+        bindPlayer(current, track);
         markPlaying(track);
-        audio.play().catch(() => toast("재생을 시작하지 못했습니다."));
-      } else audio.pause();
+      }
+      if (fromStart) current.currentTime = 0;
+      await playAudio(current);
+    };
+
+    playBtn.addEventListener("click", async () => {
+      const live = getAudioElement();
+      if (live && audioIsPlayable(live) && !live.paused) {
+        live.pause();
+        return;
+      }
+      try {
+        await startPlayback();
+      } catch {
+        toast("재생을 시작하지 못했습니다.");
+      }
     });
     mount.querySelector("#audio-back")?.addEventListener("click", () => {
       audio.currentTime = Math.max(0, audio.currentTime - 5);
@@ -367,10 +394,12 @@ export async function bindAudioPanel(root, lesson) {
       const duration = Number.isFinite(audio.duration) ? audio.duration : track.duration || 0;
       audio.currentTime = Math.min(duration, audio.currentTime + 5);
     });
-    mount.querySelector("#audio-restart")?.addEventListener("click", () => {
-      markPlaying(track);
-      audio.currentTime = 0;
-      audio.play().catch(() => toast("재생을 시작하지 못했습니다."));
+    mount.querySelector("#audio-restart")?.addEventListener("click", async () => {
+      try {
+        await startPlayback({ fromStart: true });
+      } catch {
+        toast("재생을 시작하지 못했습니다.");
+      }
     });
     loopBtn.addEventListener("click", () => {
       loopOn = !loopOn;

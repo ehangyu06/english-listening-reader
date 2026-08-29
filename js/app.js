@@ -1,14 +1,14 @@
-import { stopAudio, getNowPlaying } from "./services/audioPlayer.js?v=20260827d";
+import { stopAudio, getNowPlaying } from "./services/audioPlayer.js?v=20260829c";
 import { closeLightbox, isLightboxOpen } from "./pages/lightbox.js?v=20260816w";
-import { renderHome } from "./pages/home.js?v=20260829b";
+import { renderHome } from "./pages/home.js?v=20260829c";
 import { renderBooks, renderBookDetail } from "./pages/books.js?v=20260826c";
-import { renderLesson } from "./pages/lesson.js?v=20260827d";
+import { renderLesson } from "./pages/lesson.js?v=20260829c";
 import { renderCompare } from "./pages/compare.js?v=20260829b";
 import { renderAdd } from "./pages/add.js?v=20260825c";
 import { renderReview } from "./pages/review.js?v=20260825c";
 import { renderSearch } from "./pages/search.js?v=20260825c";
-import { isListenPlaying, renderListen, stopListenSession } from "./pages/listen.js?v=20260828a";
-import { refreshNowPlaying } from "./ui/nowPlaying.js?v=20260827d";
+import { isListenPlaying, renderListen, stopListenSession } from "./pages/listen.js?v=20260829c";
+import { refreshNowPlaying } from "./ui/nowPlaying.js?v=20260829c";
 import { go, toast, escapeHtml } from "./utils.js?v=20260816p";
 
 export async function renderApp(route) {

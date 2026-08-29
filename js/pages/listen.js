@@ -1,7 +1,7 @@
 import { getAllLessons, getLessonsByBook, groupBooks, hasAudio, getFullAudioTrack } from "../storage/lessons.js?v=20260825c";
 import { getStoredBookTitles } from "../storage/books.js?v=20260816w";
 import { getAudio } from "../storage/audio.js?v=20260825c";
-import { getAudioElement, stopAudio, swapAudio } from "../services/audioPlayer.js?v=20260827d";
+import { getAudioElement, stopAudio, swapAudio, playAudio } from "../services/audioPlayer.js?v=20260829c";
 import { escapeHtml, formatTime, naturalCompare, nl2br, toast } from "../utils.js?v=20260816p";
 
 const SPEEDS = [0.8, 0.9, 1.0, 1.1, 1.2];
@@ -602,7 +602,7 @@ function startPlayback(el, bookTitle, groups, startKey, endKey, scripturePart = 
     el.querySelector("#listen-play")?.addEventListener("click", () => {
       const audio = audioNow();
       if (!audio) return;
-      if (audio.paused) audio.play().catch(() => toast("재생을 시작하지 못했습니다."));
+      if (audio.paused) playAudio(audio).catch(() => toast("재생을 시작하지 못했습니다."));
       else audio.pause();
     });
     el.querySelector("#listen-back")?.addEventListener("click", () => {
@@ -619,7 +619,7 @@ function startPlayback(el, bookTitle, groups, startKey, endKey, scripturePart = 
       const audio = audioNow();
       if (!audio) return;
       audio.currentTime = 0;
-      audio.play().catch(() => toast("재생을 시작하지 못했습니다."));
+      playAudio(audio).catch(() => toast("재생을 시작하지 못했습니다."));
     });
     el.querySelector("#listen-next")?.addEventListener("click", () => {
       playAt(index + 1);
