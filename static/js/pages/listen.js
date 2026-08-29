@@ -3,6 +3,7 @@ import { getStoredBookTitles } from "../storage/books.js?v=20260816w";
 import { getAudio } from "../storage/audio.js?v=20260825c";
 import { getAudioElement, stopAudio, swapAudio, playAudio } from "../services/audioPlayer.js?v=20260829c";
 import { escapeHtml, formatTime, naturalCompare, nl2br, toast } from "../utils.js?v=20260816p";
+import { renderLiteralTranslationHtml } from "../ui/translationView.js?v=20260829d";
 
 const SPEEDS = [0.8, 0.9, 1.0, 1.1, 1.2];
 
@@ -677,8 +678,7 @@ function scriptHtml(lesson) {
 }
 
 function koreanHtml(lesson) {
-  const korean = String(lesson.literalTranslationKo || "").trim();
-  return korean ? nl2br(korean) : `<span class="muted">이 페이지에 한글 직역이 없습니다.</span>`;
+  return renderLiteralTranslationHtml(lesson.literalTranslationKo, "이 페이지에 한글 직역이 없습니다.");
 }
 
 function updatePlayerNow(el, bookTitle, queue, index, rangeText) {

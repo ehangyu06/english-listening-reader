@@ -6,7 +6,7 @@ import { clearCloudConfig, getCloudConfig, saveCloudConfig } from "../config.js?
 import { scriptPreviewLines } from "../services/parser.js?v=20260816p";
 import { escapeHtml, formatDate, toast } from "../utils.js?v=20260816p";
 
-const PAGES_URL = "https://ehangyu06.github.io/english-listening-reader/?r=20260829c";
+const PAGES_URL = "https://ehangyu06.github.io/english-listening-reader/?r=20260829d";
 
 export async function renderHome(el) {
   const lessons = await getAllLessons();

@@ -989,6 +989,17 @@ html.listen-wide .pen-bar {
   padding-top: 8px;
 }
 
+.translation-view {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.translation-view .compare-part,
+.listen-ko .compare-part {
+  margin: 0;
+}
+
 .translation-editor {
   width: 100%;
   min-height: 160px;
@@ -2559,6 +2570,9 @@ a.listen-pick-card {
 }
 
 .listen-ko {
+  display: grid;
+  align-content: start;
+  gap: 12px;
   font-size: 16.5px;
   line-height: 1.75;
   white-space: normal;

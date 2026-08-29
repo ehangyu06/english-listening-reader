@@ -4,6 +4,7 @@ import { getImage } from "../storage/images.js?v=20260825c";
 import { parseScriptParts, parseExpressions, scriptForCopy, scriptPartKindLabel, normalizeExpressions } from "../services/parser.js?v=20260825b";
 import { generateKoreanTranslation } from "../services/translation.js?v=20260816p";
 import { audioPanelMarkup, bindAudioPanel } from "./audioPanel.js?v=20260829c";
+import { renderLiteralTranslationHtml } from "../ui/translationView.js?v=20260829d";
 import { openLightbox } from "./lightbox.js?v=20260816w";
 import { openBookPicker } from "../ui/bookPicker.js?v=20260816y";
 import { escapeHtml, formatDate, nl2br, toast, copyText, uid } from "../utils.js?v=20260816p";
@@ -245,12 +246,11 @@ function translationBody(lesson) {
     `;
   }
   return `
-    <div class="card prose" id="translation-text">
-      ${
-        lesson.literalTranslationKo
-          ? nl2br(lesson.literalTranslationKo)
-          : `<span class="muted">아직 한글 직역이 없습니다. Listening Script를 기준으로 직접 입력하거나, AI 결과의 [TRANSLATION_KO]를 붙여넣으세요.</span>`
-      }
+    <div class="translation-view" id="translation-text">
+      ${renderLiteralTranslationHtml(
+        lesson.literalTranslationKo,
+        "아직 한글 직역이 없습니다. Listening Script를 기준으로 직접 입력하거나, AI 결과의 [TRANSLATION_KO]를 붙여넣으세요."
+      )}
     </div>
     <div class="form-actions translation-actions">
       <button type="button" class="btn btn-ghost" id="edit-translation">수정</button>

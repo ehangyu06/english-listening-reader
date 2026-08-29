@@ -1,8 +1,9 @@
 import { getLesson, saveLesson, getLessonImageIds } from "../storage/lessons.js?v=20260825c";
 import { getImage } from "../storage/images.js?v=20260825c";
-import { parseScriptParts, parseLiteralTranslation, scriptPartKindLabel, scriptForCopy, serializePairList, normalizeExpressions } from "../services/parser.js?v=20260829b";
+import { parseScriptParts, scriptPartKindLabel, scriptForCopy, serializePairList, normalizeExpressions } from "../services/parser.js?v=20260829b";
 import { copyText, escapeHtml, nl2br, toast } from "../utils.js?v=20260816q";
 import { renderPenText } from "../ui/penHighlight.js?v=20260823n";
+import { renderLiteralTranslationHtml } from "../ui/translationView.js?v=20260829d";
 
 let photoUrls = [];
 
@@ -230,47 +231,10 @@ export async function renderCompare(el, id) {
 }
 
 function koreanBody(text) {
-  const structured = translationScenesBody(text);
-  if (structured) return structured;
-  return text
-    ? `<div class="compare-text">${nl2br(text)}</div>`
-    : `<div class="muted">아직 한글 직역이 없습니다. 메인 화면이나 학습자료 수정에서 넣으면 여기에 그대로 나타납니다.</div>`;
-}
-
-function translationScenesBody(text) {
-  const scenes = parseLiteralTranslation(text).filter(
-    (scene) => scene.lines?.length || String(scene.prose || "").trim()
+  return renderLiteralTranslationHtml(
+    text,
+    "아직 한글 직역이 없습니다. 메인 화면이나 학습자료 수정에서 넣으면 여기에 그대로 나타납니다."
   );
-  const hasNotes = scenes.some((scene) => scene.lines?.some((line) => line.literal || line.idiomatic));
-  if (!hasNotes) return "";
-  return scenes
-    .map((scene) => {
-      const lines = (scene.lines || [])
-        .map((line) => {
-          const speaker = line.speaker
-            ? `<span class="compare-speaker">${escapeHtml(line.speaker)}:</span> `
-            : "";
-          const en = line.en ? `<div class="compare-line-en">${speaker}${formatCompareInline(line.en)}</div>` : "";
-          const ko = line.literal ? `<div class="compare-line-ko">${formatCompareInline(line.literal)}</div>` : "";
-          const note = line.idiomatic
-            ? `<div class="compare-line-note">${formatCompareInline(line.idiomatic)}</div>`
-            : "";
-          return `<div class="compare-line">${en}${ko}${note}</div>`;
-        })
-        .join("");
-      const prose = scene.prose ? `<div class="compare-text">${nl2br(scene.prose)}</div>` : "";
-      return `
-        <article class="card part-card compare-part">
-          <div class="part-label">${partHeading(scene)}</div>
-          ${lines}${prose}
-        </article>
-      `;
-    })
-    .join("");
-}
-
-function formatCompareInline(text) {
-  return escapeHtml(text).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
 }
 
 function partHeading(part) {
