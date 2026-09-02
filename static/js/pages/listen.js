@@ -44,6 +44,7 @@ export async function renderListen(el, route) {
 }
 
 function clearPlayLayout(el) {
+  document.querySelectorAll(".listen-mode-overlay").forEach((node) => node.remove());
   el?.classList.remove("content-listen-play");
   document.documentElement.classList.remove("listen-play-lock", "listen-player-collapsed");
   document.body.classList.remove("listen-play-lock");
@@ -200,7 +201,10 @@ async function renderChapterList(el, bookTitle, scripturePart = "") {
           </div>
         </div>
         <p class="muted listen-range-summary" id="listen-range-summary"></p>
-        <button type="button" class="btn btn-wide" id="listen-range-play">이 구간 듣기</button>
+        <div class="listen-range-actions">
+          <button type="button" class="btn btn-wide" id="listen-range-play-once">한번만 듣기</button>
+          <button type="button" class="btn btn-wide btn-ghost" id="listen-range-play-repeat">반복 듣기</button>
+        </div>
       </div>
       ${
         numbered
@@ -288,7 +292,9 @@ function bindSyncedScroll(first, second) {
 
 function bindRangeControls(el, title, groups, initial = {}) {
   const summary = el.querySelector("#listen-range-summary");
-  const playBtn = el.querySelector("#listen-range-play");
+  const playOnceBtn = el.querySelector("#listen-range-play-once");
+  const playRepeatBtn = el.querySelector("#listen-range-play-repeat");
+  const playBtns = [playOnceBtn, playRepeatBtn].filter(Boolean);
   const scripturePart = initial.scripturePart || "";
   const first = clampRangeKeys(groups, initial.startKey, initial.endKey);
   let startKey = first.startKey;
@@ -331,7 +337,9 @@ function bindRangeControls(el, title, groups, initial = {}) {
         ? `${label} · 🎧 ${range.queue.length}`
         : "이 구간에 오디오가 없습니다.";
     }
-    if (playBtn) playBtn.disabled = !range.queue.length;
+    playBtns.forEach((btn) => {
+      btn.disabled = !range.queue.length;
+    });
   };
 
   const revealChip = (key) => {
@@ -372,11 +380,13 @@ function bindRangeControls(el, title, groups, initial = {}) {
       });
     });
   });
-  playBtn?.addEventListener("click", () => {
+  const startRange = (loop) => {
     const range = selectedRange();
     saveRangeDraft(title, scripturePart, range.startKey, range.endKey);
-    startPlayback(el, title, groups, range.startKey, range.endKey, scripturePart);
-  });
+    startPlayback(el, title, groups, range.startKey, range.endKey, scripturePart, loop);
+  };
+  playOnceBtn?.addEventListener("click", () => startRange(false));
+  playRepeatBtn?.addEventListener("click", () => startRange(true));
   bindSyncedScroll(el.querySelector("[data-listen-start-scroll]"), el.querySelector("[data-listen-end-scroll]"));
   saveRangeDraft(title, scripturePart, startKey, endKey);
   paint();
@@ -498,7 +508,7 @@ function orderedRange(groups, startKey, endKey) {
   };
 }
 
-function startPlayback(el, bookTitle, groups, startKey, endKey, scripturePart = "") {
+function startPlayback(el, bookTitle, groups, startKey, endKey, scripturePart = "", loopRange = false) {
   const range = orderedRange(groups, startKey, endKey);
   const queue = range.queue;
   if (!queue.length) {
@@ -509,6 +519,7 @@ function startPlayback(el, bookTitle, groups, startKey, endKey, scripturePart = 
 
   const mySession = ++sessionId;
   playing = true;
+  let loop = Boolean(loopRange);
   let index = 0;
   let seeking = false;
   let framed = false;
@@ -525,6 +536,11 @@ function startPlayback(el, bookTitle, groups, startKey, endKey, scripturePart = 
   };
 
   const preloadAround = (from) => {
+    if (loop && queue.length) {
+      loadBlob(queue[(from + 1) % queue.length]).catch(() => {});
+      if (queue.length > 1) loadBlob(queue[(from + 2) % queue.length]).catch(() => {});
+      return;
+    }
     loadBlob(queue[from + 1]).catch(() => {});
     loadBlob(queue[from + 2]).catch(() => {});
   };
@@ -562,6 +578,10 @@ function startPlayback(el, bookTitle, groups, startKey, endKey, scripturePart = 
   const playAt = async (nextIndex, { auto = false } = {}) => {
     if (mySession !== sessionId) return;
     if (nextIndex >= queue.length) {
+      if (loop && queue.length) {
+        await playAt(0, { auto: true });
+        return;
+      }
       playing = false;
       stopAudio();
       toast("선택한 구간을 끝까지 들었습니다.");
@@ -580,12 +600,12 @@ function startPlayback(el, bookTitle, groups, startKey, endKey, scripturePart = 
     index = nextIndex;
     const audio = swapAudio(blob);
     if (!framed) {
-      drawPlayer(el, bookTitle, queue, index, rangeText);
+      drawPlayer(el, bookTitle, queue, index, rangeText, loop);
       bindListenSheet(el);
       bindDrawnControls();
       framed = true;
     } else {
-      updatePlayerNow(el, bookTitle, queue, index, rangeText);
+      updatePlayerNow(el, bookTitle, queue, index, rangeText, loop);
     }
     bindPlayer(audio);
     paint();
@@ -625,6 +645,11 @@ function startPlayback(el, bookTitle, groups, startKey, endKey, scripturePart = 
     el.querySelector("#listen-next")?.addEventListener("click", () => {
       playAt(index + 1);
     });
+    el.querySelector("#listen-loop")?.addEventListener("click", () => {
+      loop = !loop;
+      paintLoopButton();
+      updatePlayerNow(el, bookTitle, queue, index, rangeText, loop);
+    });
     el.querySelector("#listen-stop")?.addEventListener("click", async () => {
       if (mySession !== sessionId) return;
       stopListenSession();
@@ -661,15 +686,30 @@ function startPlayback(el, bookTitle, groups, startKey, endKey, scripturePart = 
     });
   };
 
+  const paintLoopButton = () => {
+    const btn = el.querySelector("#listen-loop");
+    if (!btn) return;
+    btn.classList.toggle("is-active", loop);
+    btn.setAttribute("aria-pressed", loop ? "true" : "false");
+    btn.textContent = loop ? "반복 중" : "반복";
+  };
+
   playAt(0);
 }
 
-function nowLine(queue, index) {
+function nowLine(queue, index, loop = false) {
   const lesson = queue[index];
-  const next = queue[index + 1];
+  const next = queue[index + 1] || (loop && queue.length > 1 ? queue[0] : null);
   return `${lesson.chapter} · Page ${lesson.page} · ${index + 1} / ${queue.length}${
-    next ? ` · 다음 ${next.chapter} · Page ${next.page}` : ""
+    next ? ` · 다음 ${next.chapter} · Page ${next.page}` : loop ? " · 반복" : ""
   }`;
+}
+
+function rangeKicker(rangeText, loop = false) {
+  const parts = ["연속듣기"];
+  if (rangeText) parts.push(rangeText);
+  if (loop) parts.push("반복");
+  return parts.join(" · ");
 }
 
 function scriptHtml(lesson) {
@@ -681,17 +721,17 @@ function koreanHtml(lesson) {
   return renderLiteralTranslationHtml(lesson.literalTranslationKo, "이 페이지에 한글 직역이 없습니다.");
 }
 
-function updatePlayerNow(el, bookTitle, queue, index, rangeText) {
+function updatePlayerNow(el, bookTitle, queue, index, rangeText, loop = false) {
   const lesson = queue[index];
-  const next = queue[index + 1];
+  const next = queue[index + 1] || (loop && queue.length > 1 ? queue[0] : null);
   const now = el.querySelector("[data-listen-now]");
-  if (now) now.textContent = nowLine(queue, index);
+  if (now) now.textContent = nowLine(queue, index, loop);
   const mini = el.querySelector("[data-listen-mini]");
   if (mini) mini.textContent = `${lesson.chapter} · ${index + 1}/${queue.length}`;
   const nextBtn = el.querySelector("#listen-next");
-  if (nextBtn) nextBtn.disabled = !next;
+  if (nextBtn) nextBtn.disabled = queue.length < 2 || (!next && !loop);
   const kicker = el.querySelector("[data-listen-range]");
-  if (kicker) kicker.textContent = `연속듣기${rangeText ? ` · ${rangeText}` : ""}`;
+  if (kicker) kicker.textContent = rangeKicker(rangeText, loop);
   const scriptEl = el.querySelector("#listen-script");
   const koEl = el.querySelector("#listen-ko");
   if (scriptEl) {
@@ -730,9 +770,9 @@ function bindListenSheet(el) {
   });
 }
 
-function drawPlayer(el, bookTitle, queue, index, rangeText = "") {
+function drawPlayer(el, bookTitle, queue, index, rangeText = "", loop = false) {
   const lesson = queue[index];
-  const next = queue[index + 1];
+  const next = queue[index + 1] || (loop && queue.length > 1 ? queue[0] : null);
   const speeds = SPEEDS.map((speed) => {
     const active = speed === playbackRate ? "is-active" : "";
     const text = speed === 1 ? "1.0x" : `${speed}x`;
@@ -760,9 +800,9 @@ function drawPlayer(el, bookTitle, queue, index, rangeText = "") {
           </button>
           <div class="listen-player-main">
             <div class="listen-now">
-              <div class="player-kicker" data-listen-range>연속듣기${rangeText ? ` · ${escapeHtml(rangeText)}` : ""}</div>
+              <div class="player-kicker" data-listen-range>${escapeHtml(rangeKicker(rangeText, loop))}</div>
               <div class="book-title">${escapeHtml(bookTitle)}</div>
-              <div class="muted" data-listen-now>${escapeHtml(nowLine(queue, index))}</div>
+              <div class="muted" data-listen-now>${escapeHtml(nowLine(queue, index, loop))}</div>
               <div class="listen-mini-now" data-listen-mini>${escapeHtml(lesson.chapter)} · ${index + 1}/${queue.length}</div>
             </div>
             <div class="audio-transport listen-transport">
@@ -781,7 +821,8 @@ function drawPlayer(el, bookTitle, queue, index, rangeText = "") {
               <div class="speed-row">${speeds}</div>
               <div class="listen-tool-actions">
                 <button type="button" class="text-btn" id="listen-restart">처음부터</button>
-                <button type="button" class="text-btn" id="listen-next" ${next ? "" : "disabled"}>다음 페이지</button>
+                <button type="button" class="text-btn" id="listen-next" ${queue.length < 2 || (!next && !loop) ? "disabled" : ""}>다음 페이지</button>
+                <button type="button" class="text-btn${loop ? " is-active" : ""}" id="listen-loop" aria-pressed="${loop ? "true" : "false"}">${loop ? "반복 중" : "반복"}</button>
                 <button type="button" class="text-btn" id="listen-chapters">구간 선택</button>
                 <button type="button" class="text-btn danger" id="listen-stop">중단</button>
               </div>

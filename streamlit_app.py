@@ -2,7 +2,7 @@
 
 import streamlit as st
 
-PAGES_URL = "https://ehangyu06.github.io/english-listening-reader/?r=20260829d"
+PAGES_URL = "https://ehangyu06.github.io/english-listening-reader/?r=20260902b"
 
 st.set_page_config(page_title="Listening Reader", layout="centered")
 st.title("Listening Reader")

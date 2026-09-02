@@ -1806,6 +1806,20 @@ html.compare-lock #app {
   min-width: 88px;
 }
 
+.listen-mode-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.listen-mode-actions .btn {
+  min-height: 52px;
+}
+
+.listen-mode-actions .text-btn {
+  justify-self: center;
+  min-height: 44px;
+}
+
 .example-panel {
   width: min(560px, 100%);
   max-height: min(78dvh, 720px);
@@ -2394,6 +2408,11 @@ a.listen-pick-card {
   margin: 0;
 }
 
+.listen-range-actions {
+  display: grid;
+  gap: 8px;
+}
+
 .listen-play {
   flex: 1;
   display: grid;
@@ -2523,6 +2542,12 @@ a.listen-pick-card {
 .listen-tool-actions .text-btn.danger {
   border-color: #e4cfc8;
   background: #fff8f6;
+}
+
+.listen-tool-actions #listen-loop.is-active {
+  background: var(--accent);
+  color: #f7f4ee;
+  border-color: var(--accent);
 }
 
 .listen-texts {
