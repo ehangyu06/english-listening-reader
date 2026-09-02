@@ -385,8 +385,33 @@ function bindRangeControls(el, title, groups, initial = {}) {
     saveRangeDraft(title, scripturePart, range.startKey, range.endKey);
     startPlayback(el, title, groups, range.startKey, range.endKey, scripturePart, loop);
   };
-  playOnceBtn?.addEventListener("click", () => startRange(false));
-  playRepeatBtn?.addEventListener("click", () => startRange(true));
+
+  const bindPlayPress = (btn, loop) => {
+    if (!btn) return;
+    const press = () => {
+      if (btn.disabled) return;
+      btn.classList.add("is-pressed");
+    };
+    const release = () => {
+      if (btn.dataset.listenStarting === "1") return;
+      btn.classList.remove("is-pressed");
+    };
+    btn.addEventListener("pointerdown", press);
+    btn.addEventListener("pointercancel", release);
+    btn.addEventListener("pointerleave", release);
+    btn.addEventListener("click", async () => {
+      if (btn.disabled || btn.dataset.listenStarting === "1") return;
+      btn.dataset.listenStarting = "1";
+      btn.classList.add("is-pressed");
+      playBtns.forEach((item) => {
+        item.disabled = true;
+      });
+      await new Promise((resolve) => setTimeout(resolve, 450));
+      startRange(loop);
+    });
+  };
+  bindPlayPress(playOnceBtn, false);
+  bindPlayPress(playRepeatBtn, true);
   bindSyncedScroll(el.querySelector("[data-listen-start-scroll]"), el.querySelector("[data-listen-end-scroll]"));
   saveRangeDraft(title, scripturePart, startKey, endKey);
   paint();
