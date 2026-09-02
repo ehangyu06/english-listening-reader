@@ -441,6 +441,102 @@ function parseChapterName(chapter) {
   return { raw, prefix, number };
 }
 
+function parseVerseRange(value) {
+  const raw = String(value || "")
+    .trim()
+    .replace(/\u2013|\u2014/g, "-");
+  const range = raw.match(/^(\d+)\s*[-~]\s*(\d+)$/);
+  if (range) return { start: Number(range[1]), end: Number(range[2]) };
+  return null;
+}
+
+function extractVersesFromText(text, chapterNumber) {
+  const raw = String(text || "").replace(/\u2013|\u2014/g, "-");
+  if (!raw) return null;
+  if (chapterNumber != null) {
+    const chapter = String(chapterNumber);
+    const patterns = [
+      new RegExp(`(?:Isaiah|이사야)\\s*${chapter}\\s*[:장]\\s*(\\d+)\\s*[-~]\\s*(\\d+)`, "i"),
+      new RegExp(`${chapter}\\s*:\\s*(\\d+)\\s*[-~]\\s*(\\d+)`),
+      new RegExp(`${chapter}\\s*장\\s*(\\d+)\\s*[-~]\\s*(\\d+)\\s*절`),
+    ];
+    for (const pattern of patterns) {
+      const match = raw.match(pattern);
+      if (match) return { start: Number(match[1]), end: Number(match[2]) };
+    }
+  }
+  const labeled = raw.match(/(?:verses?|절)\s*(\d+)\s*[-~]\s*(\d+)/i);
+  if (labeled) return { start: Number(labeled[1]), end: Number(labeled[2]) };
+  return null;
+}
+
+function resolveVerses(lesson, chapterNumber) {
+  const fromPage = parseVerseRange(lesson?.page);
+  if (fromPage) return fromPage;
+  const texts = [lesson?.script, lesson?.literalTranslationKo, lesson?.summaryKo, lesson?.pageInterpretationKo];
+  for (const text of texts) {
+    const found = extractVersesFromText(text, chapterNumber);
+    if (found) return found;
+  }
+  return null;
+}
+
+function lessonPassage(lesson) {
+  const parts = parseChapterName(lesson?.chapter);
+  return {
+    name: isScripturePrefix(parts.prefix) ? parts.prefix : "",
+    chapter: parts.number,
+    label: parts.raw,
+    verses: resolveVerses(lesson, parts.number),
+  };
+}
+
+function formatVerseRef(passage, { withName = false } = {}) {
+  if (!passage) return "";
+  let body = passage.label;
+  if (passage.chapter != null && passage.verses) {
+    const end = passage.verses.end != null && passage.verses.end !== passage.verses.start ? `-${passage.verses.end}` : "";
+    body = `${passage.chapter}:${passage.verses.start}${end}`;
+  } else if (passage.chapter != null) {
+    body = `${passage.chapter}장`;
+  }
+  if (withName && passage.name) return `${passage.name} ${body}`;
+  return body;
+}
+
+function formatChapterSpan(first, last) {
+  const start = first?.chapter;
+  const end = last?.chapter;
+  if (start != null && end != null && start !== end) return `${start}장 - ${end}장`;
+  if (start != null) return `${start}장`;
+  if (first?.label && last?.label && first.label !== last.label) return `${first.label} - ${last.label}`;
+  return first?.label || "";
+}
+
+function listenRangeLabel(queue) {
+  if (!queue.length) return "";
+  const first = lessonPassage(queue[0]);
+  const last = lessonPassage(queue[queue.length - 1]);
+  const start = formatVerseRef(first, { withName: true });
+  if (queue.length === 1) return start;
+  const end = formatVerseRef(last, { withName: Boolean(last.name && last.name !== first.name) });
+  return `${start} ~ ${end}`;
+}
+
+function miniNowLine(queue, index, loop = false) {
+  const current = formatVerseRef(lessonPassage(queue[index]));
+  const span = formatChapterSpan(lessonPassage(queue[0]), lessonPassage(queue[queue.length - 1]));
+  const mode = loop ? "반복" : "한번";
+  return span ? `${current} (${span}, ${mode})` : `${current} (${mode})`;
+}
+
+function listenBookLabel(queue, bookTitle) {
+  const first = lessonPassage(queue[0]);
+  const last = lessonPassage(queue[queue.length - 1]);
+  if (first.name && first.name === last.name) return first.name;
+  return bookTitle;
+}
+
 function isScripturePrefix(prefix) {
   const key = String(prefix || "").trim();
   if (!key) return false;
@@ -722,12 +818,8 @@ function startPlayback(el, bookTitle, groups, startKey, endKey, scripturePart = 
   playAt(0);
 }
 
-function nowLine(queue, index, loop = false) {
-  const lesson = queue[index];
-  const next = queue[index + 1] || (loop && queue.length > 1 ? queue[0] : null);
-  return `${lesson.chapter} · Page ${lesson.page} · ${index + 1} / ${queue.length}${
-    next ? ` · 다음 ${next.chapter} · Page ${next.page}` : loop ? " · 반복" : ""
-  }`;
+function nowLine(queue) {
+  return listenRangeLabel(queue);
 }
 
 function rangeKicker(rangeText, loop = false) {
@@ -749,10 +841,12 @@ function koreanHtml(lesson) {
 function updatePlayerNow(el, bookTitle, queue, index, rangeText, loop = false) {
   const lesson = queue[index];
   const next = queue[index + 1] || (loop && queue.length > 1 ? queue[0] : null);
+  const titleEl = el.querySelector(".listen-now .book-title");
+  if (titleEl) titleEl.textContent = listenBookLabel(queue, bookTitle);
   const now = el.querySelector("[data-listen-now]");
-  if (now) now.textContent = nowLine(queue, index, loop);
+  if (now) now.textContent = nowLine(queue);
   const mini = el.querySelector("[data-listen-mini]");
-  if (mini) mini.textContent = `${lesson.chapter} · ${index + 1}/${queue.length}`;
+  if (mini) mini.textContent = miniNowLine(queue, index, loop);
   const nextBtn = el.querySelector("#listen-next");
   if (nextBtn) nextBtn.disabled = queue.length < 2 || (!next && !loop);
   const kicker = el.querySelector("[data-listen-range]");
@@ -826,9 +920,9 @@ function drawPlayer(el, bookTitle, queue, index, rangeText = "", loop = false) {
           <div class="listen-player-main">
             <div class="listen-now">
               <div class="player-kicker" data-listen-range>${escapeHtml(rangeKicker(rangeText, loop))}</div>
-              <div class="book-title">${escapeHtml(bookTitle)}</div>
-              <div class="muted" data-listen-now>${escapeHtml(nowLine(queue, index, loop))}</div>
-              <div class="listen-mini-now" data-listen-mini>${escapeHtml(lesson.chapter)} · ${index + 1}/${queue.length}</div>
+              <div class="book-title">${escapeHtml(listenBookLabel(queue, bookTitle))}</div>
+              <div class="muted" data-listen-now>${escapeHtml(nowLine(queue))}</div>
+              <div class="listen-mini-now" data-listen-mini>${escapeHtml(miniNowLine(queue, index, loop))}</div>
             </div>
             <div class="audio-transport listen-transport">
               <button type="button" class="btn btn-ghost btn-skip" id="listen-back" aria-label="5초 뒤로">-5초</button>

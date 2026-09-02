@@ -2674,6 +2674,8 @@ html.listen-play-lock #app {
   display: none;
   font-size: 13px;
   font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .listen-player-dock.is-collapsed .listen-player {
