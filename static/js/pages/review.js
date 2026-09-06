@@ -1,4 +1,4 @@
-import { getAllLessons, saveLesson } from "../storage/lessons.js?v=20260906q";
+import { getAllLessons, saveLesson } from "../storage/lessons.js?v=20260906r";
 import { normalizeExpressions } from "../services/parser.js?v=20260825b";
 import {
   loadReviewBookmark,
@@ -7,7 +7,7 @@ import {
   saveReviewJump,
   saveReviewListState,
 } from "../storage/reviewJump.js?v=20260906n";
-import { rememberDeletedIds } from "../storage/lessonMerge.js?v=20260906q";
+import { rememberDeletedIds } from "../storage/lessonMerge.js?v=20260906r";
 import { askConfirm } from "../ui/confirm.js?v=20260816p";
 import { openExampleEditor, openExampleFinder } from "../ui/examplePanel.js?v=20260823e";
 import { bindExamplePen, collectHighlightSnippets, remapHighlights, renderPenText } from "../ui/penHighlight.js?v=20260823o";

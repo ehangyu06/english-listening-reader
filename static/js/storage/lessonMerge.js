@@ -1,7 +1,8 @@
-// Protect only against catastrophic shrink (half gone / 20+ missing).
-// Deleted ids are remembered so sync cannot resurrect them.
-const PROTECT_MIN_LOST = 20;
-const PROTECT_RATIO = 0.5;
+// Expression sync rules:
+// 1) deletedExpressionIds are remembered (union) and never resurrected.
+// 2) Non-deleted expressions are merged by id from both sides so new adds are kept.
+// 3) Legacy cleanup without tombstones: if one side is a smaller subset and the
+//    larger side only reintroduces older ids, drop those old extras.
 
 function itemKey(item) {
   if (!item || typeof item !== "object") return "";
@@ -9,10 +10,6 @@ function itemKey(item) {
   if (id) return id;
   const phrase = String(item.phrase || "").trim().toLowerCase();
   return phrase ? `phrase:${phrase}` : "";
-}
-
-function isNewer(a, b) {
-  return String(a?.updatedAt || "") >= String(b?.updatedAt || "");
 }
 
 function asIdList(value) {
@@ -81,18 +78,9 @@ export function mergeItemLists(primary, secondary) {
   return [...map.values()];
 }
 
-export function shouldProtectList(incoming, existing) {
-  const incomingN = Array.isArray(incoming) ? incoming.length : 0;
-  const existingN = Array.isArray(existing) ? existing.length : 0;
-  if (!existingN || incomingN >= existingN) return false;
-  const lost = existingN - incomingN;
-  return lost >= PROTECT_MIN_LOST || incomingN < existingN * PROTECT_RATIO;
-}
-
 export function rememberDeletedIds(lesson, ids, field = "deletedExpressionIds") {
   if (!lesson || !ids?.length) return lesson;
-  const next = unionIds(lesson[field], ids);
-  lesson[field] = [...next];
+  lesson[field] = [...unionIds(lesson[field], ids)];
   return lesson;
 }
 
@@ -103,55 +91,31 @@ export function forgetDeletedIds(lesson, ids, field = "deletedExpressionIds") {
   return lesson;
 }
 
-function chooseExpressionList(preferred, other) {
-  const preferredList = Array.isArray(preferred?.expressions) ? preferred.expressions : [];
-  const otherList = Array.isArray(other?.expressions) ? other.expressions : [];
-
-  if (shouldProtectList(preferredList, otherList)) {
-    return mergeItemLists(preferredList, otherList);
-  }
-
-  // Newer/larger list that only reintroduces older ids the smaller side already dropped:
-  // treat as resurrected deletes and keep the smaller list, plus any truly new adds.
-  if (
-    otherList.length &&
-    preferredList.length > otherList.length &&
-    isIdSubset(otherList, preferredList)
-  ) {
-    const otherIds = idSet(otherList);
-    const extras = preferredList.filter((item) => {
-      const id = String(item?.id || "").trim();
-      return id && !otherIds.has(id);
-    });
-    const cutoff = lessonTime(other);
-    const genuineAdds = extras.filter((item) => itemTime(item) > cutoff);
-    return mergeItemLists(otherList, genuineAdds);
-  }
-
-  return preferredList;
+// largerList contains smallerList ids; drop larger-only items unless newly created
+// after the smaller side's updatedAt (genuine adds from the other device).
+function dropOldExtras(merged, largerList, smallerList, smallerLesson) {
+  if (!smallerList.length || largerList.length <= smallerList.length) return merged;
+  if (!isIdSubset(smallerList, largerList)) return merged;
+  const keepIds = idSet(smallerList);
+  const cutoff = lessonTime(smallerLesson);
+  return merged.filter((item) => {
+    const id = String(item?.id || "").trim();
+    if (id && keepIds.has(id)) return true;
+    return itemTime(item) > cutoff;
+  });
 }
 
-function chooseListeningList(preferred, other) {
-  const preferredList = Array.isArray(preferred?.listeningPoints) ? preferred.listeningPoints : [];
-  const otherList = Array.isArray(other?.listeningPoints) ? other.listeningPoints : [];
-  if (shouldProtectList(preferredList, otherList)) {
-    return mergeItemLists(preferredList, otherList);
+function mergeField(preferred, other, field) {
+  const preferredList = Array.isArray(preferred?.[field]) ? preferred[field] : [];
+  const otherList = Array.isArray(other?.[field]) ? other[field] : [];
+  let merged = mergeItemLists(preferredList, otherList);
+
+  if (preferredList.length >= otherList.length) {
+    merged = dropOldExtras(merged, preferredList, otherList, other);
+  } else {
+    merged = dropOldExtras(merged, otherList, preferredList, preferred);
   }
-  if (
-    otherList.length &&
-    preferredList.length > otherList.length &&
-    isIdSubset(otherList, preferredList)
-  ) {
-    const otherIds = idSet(otherList);
-    const extras = preferredList.filter((item) => {
-      const id = String(item?.id || "").trim();
-      return id && !otherIds.has(id);
-    });
-    const cutoff = lessonTime(other);
-    const genuineAdds = extras.filter((item) => itemTime(item) > cutoff);
-    return mergeItemLists(otherList, genuineAdds);
-  }
-  return preferredList;
+  return merged;
 }
 
 export function protectLesson(incoming, existing) {
@@ -162,25 +126,27 @@ export function protectLesson(incoming, existing) {
   next.deletedExpressionIds = [...deletedExpr];
   next.deletedListeningIds = [...deletedListen];
 
-  const trustIncoming =
-    isNewer(incoming, existing) &&
-    !shouldProtectList(incoming.expressions, existing.expressions) &&
-    !shouldProtectList(incoming.listeningPoints, existing.listeningPoints);
+  // Keep unique items from both sides, then remove tombstoned ids.
+  // Newer lesson wins per-id field conflicts via mergeItemLists(primary=incoming).
+  let expressions = mergeItemLists(incoming.expressions, existing.expressions);
+  let listeningPoints = mergeItemLists(incoming.listeningPoints, existing.listeningPoints);
 
-  if (trustIncoming) {
-    next.expressions = filterDeleted(incoming.expressions, deletedExpr);
-    next.listeningPoints = filterDeleted(incoming.listeningPoints, deletedListen);
-    return next;
+  const incomingList = Array.isArray(incoming.expressions) ? incoming.expressions : [];
+  const existingList = Array.isArray(existing.expressions) ? existing.expressions : [];
+  if (incomingList.length >= existingList.length) {
+    expressions = dropOldExtras(expressions, incomingList, existingList, existing);
+  } else {
+    expressions = dropOldExtras(expressions, existingList, incomingList, incoming);
   }
 
-  let expressions = Array.isArray(incoming.expressions) ? [...incoming.expressions] : [];
-  let listeningPoints = Array.isArray(incoming.listeningPoints) ? [...incoming.listeningPoints] : [];
-  if (shouldProtectList(incoming.expressions, existing.expressions)) {
-    expressions = mergeItemLists(incoming.expressions, existing.expressions);
+  const incomingListen = Array.isArray(incoming.listeningPoints) ? incoming.listeningPoints : [];
+  const existingListen = Array.isArray(existing.listeningPoints) ? existing.listeningPoints : [];
+  if (incomingListen.length >= existingListen.length) {
+    listeningPoints = dropOldExtras(listeningPoints, incomingListen, existingListen, existing);
+  } else {
+    listeningPoints = dropOldExtras(listeningPoints, existingListen, incomingListen, incoming);
   }
-  if (shouldProtectList(incoming.listeningPoints, existing.listeningPoints)) {
-    listeningPoints = mergeItemLists(incoming.listeningPoints, existing.listeningPoints);
-  }
+
   next.expressions = filterDeleted(expressions, deletedExpr);
   next.listeningPoints = filterDeleted(listeningPoints, deletedListen);
   return next;
@@ -194,7 +160,12 @@ export function mergeLessons(preferred, other) {
   const deletedListen = unionIds(preferred.deletedListeningIds, other.deletedListeningIds);
   next.deletedExpressionIds = [...deletedExpr];
   next.deletedListeningIds = [...deletedListen];
-  next.expressions = filterDeleted(chooseExpressionList(preferred, other), deletedExpr);
-  next.listeningPoints = filterDeleted(chooseListeningList(preferred, other), deletedListen);
+  next.expressions = filterDeleted(mergeField(preferred, other, "expressions"), deletedExpr);
+  next.listeningPoints = filterDeleted(mergeField(preferred, other, "listeningPoints"), deletedListen);
   return next;
+}
+
+// Kept for callers/tests that still import the old name.
+export function shouldProtectList() {
+  return false;
 }

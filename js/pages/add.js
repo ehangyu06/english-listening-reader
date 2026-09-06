@@ -1,4 +1,4 @@
-import { getAllLessons, getLesson, saveLesson, getLessonImageIds, MAX_PAGE_PHOTOS } from "../storage/lessons.js?v=20260906q";
+import { getAllLessons, getLesson, saveLesson, getLessonImageIds, MAX_PAGE_PHOTOS } from "../storage/lessons.js?v=20260906r";
 import { listBookTitles } from "../storage/books.js?v=20260816w";
 import { getSetting, setSetting } from "../storage/db.js?v=20260825c";
 import { saveImage, getImage, deleteImage, compressImageFile } from "../storage/images.js?v=20260825c";

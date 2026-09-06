@@ -97,6 +97,25 @@ def _should_protect_list(incoming, existing):
     return lost >= PROTECT_MIN_LOST or incoming_n < existing_n * PROTECT_RATIO
 
 
+def _drop_old_extras(merged, larger_list, smaller_list, smaller_lesson):
+    larger_list = list(larger_list or [])
+    smaller_list = list(smaller_list or [])
+    if not smaller_list or len(larger_list) <= len(smaller_list):
+        return list(merged or [])
+    if not _ids_subset(smaller_list, larger_list):
+        return list(merged or [])
+    keep_ids = {_item_key(item) for item in smaller_list if _item_key(item)}
+    cutoff = _parse_time((smaller_lesson or {}).get("updatedAt"))
+    out = []
+    for item in merged or []:
+        key = _item_key(item)
+        if key and key in keep_ids:
+            out.append(item)
+        elif _item_time(item) > cutoff:
+            out.append(item)
+    return out
+
+
 def _protect_lesson(incoming, existing):
     if not isinstance(existing, dict) or not isinstance(incoming, dict):
         return incoming
@@ -121,35 +140,26 @@ def _protect_lesson(incoming, existing):
     next_lesson["deletedExpressionIds"] = list(deleted_expr)
     next_lesson["deletedListeningIds"] = list(deleted_listen)
 
-    incoming_newer = str(incoming.get("updatedAt") or "") >= str(existing.get("updatedAt") or "")
-    catastrophic = _should_protect_list(
-        incoming.get("expressions"), existing.get("expressions")
-    ) or _should_protect_list(incoming.get("listeningPoints"), existing.get("listeningPoints"))
-
-    expressions = list(incoming.get("expressions") or [])
-    listening = list(incoming.get("listeningPoints") or [])
-    if not (incoming_newer and not catastrophic):
-        if _should_protect_list(incoming.get("expressions"), existing.get("expressions")):
-            expressions = _merge_items(incoming.get("expressions"), existing.get("expressions"))
-        if _should_protect_list(incoming.get("listeningPoints"), existing.get("listeningPoints")):
-            listening = _merge_items(incoming.get("listeningPoints"), existing.get("listeningPoints"))
-
-    # Prefer the smaller side when the larger side only reintroduces older ids.
+    incoming_expr = list(incoming.get("expressions") or [])
     existing_expr = list(existing.get("expressions") or [])
-    if (
-        incoming_newer
-        and existing_expr
-        and len(expressions) > len(existing_expr)
-        and _ids_subset(existing_expr, expressions)
-    ):
-        existing_ids = {_item_key(item) for item in existing_expr}
-        extras = [item for item in expressions if _item_key(item) not in existing_ids]
-        cutoff = _parse_time(existing.get("updatedAt"))
-        genuine = [item for item in extras if _item_time(item) > cutoff]
-        expressions = _merge_items(existing_expr, genuine)
+    expressions = _merge_items(incoming_expr, existing_expr)
+    if len(incoming_expr) >= len(existing_expr):
+        expressions = _drop_old_extras(expressions, incoming_expr, existing_expr, existing)
+    else:
+        expressions = _drop_old_extras(expressions, existing_expr, incoming_expr, incoming)
+
+    incoming_listen = list(incoming.get("listeningPoints") or [])
+    existing_listen = list(existing.get("listeningPoints") or [])
+    listening = _merge_items(incoming_listen, existing_listen)
+    if len(incoming_listen) >= len(existing_listen):
+        listening = _drop_old_extras(listening, incoming_listen, existing_listen, existing)
+    else:
+        listening = _drop_old_extras(listening, existing_listen, incoming_listen, incoming)
 
     next_lesson["expressions"] = [
-        item for item in expressions if _item_key(item) not in deleted_expr and str(item.get("id") or "") not in deleted_expr
+        item
+        for item in expressions
+        if _item_key(item) not in deleted_expr and str(item.get("id") or "") not in deleted_expr
     ]
     next_lesson["listeningPoints"] = [
         item

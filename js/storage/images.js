@@ -1,5 +1,5 @@
 import { runStore } from "./db.js?v=20260825c";
-import { remoteDeleteBlob, remoteGetBlob, remotePutBlob } from "./remote.js?v=20260906q";
+import { remoteDeleteBlob, remoteGetBlob, remotePutBlob } from "./remote.js?v=20260906r";
 
 export async function saveImage(record) {
   await runStore("images", "readwrite", (store) => store.put(record));

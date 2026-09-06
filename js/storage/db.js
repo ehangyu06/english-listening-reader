@@ -113,7 +113,7 @@ export async function getSetting(key, fallback = null) {
 export async function setSetting(key, value) {
   await runStore("settings", "readwrite", (store) => store.put({ key, value }));
   try {
-    const { remotePutSetting } = await import("./remote.js?v=20260906q");
+    const { remotePutSetting } = await import("./remote.js?v=20260906r");
     await remotePutSetting(key, value);
   } catch (error) {
     console.warn(error);
