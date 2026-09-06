@@ -101,19 +101,87 @@ def _protect_lesson(incoming, existing):
     if not isinstance(existing, dict) or not isinstance(incoming, dict):
         return incoming
     next_lesson = dict(incoming)
+
+    def union_deleted(a, b):
+        out = []
+        seen = set()
+        for value in list(a or []) + list(b or []):
+            key = str(value or "").strip()
+            if key and key not in seen:
+                seen.add(key)
+                out.append(key)
+        return out
+
+    deleted_expr = set(
+        union_deleted(incoming.get("deletedExpressionIds"), existing.get("deletedExpressionIds"))
+    )
+    deleted_listen = set(
+        union_deleted(incoming.get("deletedListeningIds"), existing.get("deletedListeningIds"))
+    )
+    next_lesson["deletedExpressionIds"] = list(deleted_expr)
+    next_lesson["deletedListeningIds"] = list(deleted_listen)
+
     incoming_newer = str(incoming.get("updatedAt") or "") >= str(existing.get("updatedAt") or "")
     catastrophic = _should_protect_list(
         incoming.get("expressions"), existing.get("expressions")
     ) or _should_protect_list(incoming.get("listeningPoints"), existing.get("listeningPoints"))
-    if incoming_newer and not catastrophic:
-        return next_lesson
-    if _should_protect_list(incoming.get("expressions"), existing.get("expressions")):
-        next_lesson["expressions"] = _merge_items(incoming.get("expressions"), existing.get("expressions"))
-    if _should_protect_list(incoming.get("listeningPoints"), existing.get("listeningPoints")):
-        next_lesson["listeningPoints"] = _merge_items(
-            incoming.get("listeningPoints"), existing.get("listeningPoints")
-        )
+
+    expressions = list(incoming.get("expressions") or [])
+    listening = list(incoming.get("listeningPoints") or [])
+    if not (incoming_newer and not catastrophic):
+        if _should_protect_list(incoming.get("expressions"), existing.get("expressions")):
+            expressions = _merge_items(incoming.get("expressions"), existing.get("expressions"))
+        if _should_protect_list(incoming.get("listeningPoints"), existing.get("listeningPoints")):
+            listening = _merge_items(incoming.get("listeningPoints"), existing.get("listeningPoints"))
+
+    # Prefer the smaller side when the larger side only reintroduces older ids.
+    existing_expr = list(existing.get("expressions") or [])
+    if (
+        incoming_newer
+        and existing_expr
+        and len(expressions) > len(existing_expr)
+        and _ids_subset(existing_expr, expressions)
+    ):
+        existing_ids = {_item_key(item) for item in existing_expr}
+        extras = [item for item in expressions if _item_key(item) not in existing_ids]
+        cutoff = _parse_time(existing.get("updatedAt"))
+        genuine = [item for item in extras if _item_time(item) > cutoff]
+        expressions = _merge_items(existing_expr, genuine)
+
+    next_lesson["expressions"] = [
+        item for item in expressions if _item_key(item) not in deleted_expr and str(item.get("id") or "") not in deleted_expr
+    ]
+    next_lesson["listeningPoints"] = [
+        item
+        for item in listening
+        if _item_key(item) not in deleted_listen and str(item.get("id") or "") not in deleted_listen
+    ]
     return next_lesson
+
+
+def _ids_subset(smaller, larger):
+    large_ids = {_item_key(item) for item in larger or [] if _item_key(item)}
+    if not smaller:
+        return True
+    if not large_ids:
+        return False
+    return all(_item_key(item) in large_ids for item in smaller)
+
+
+def _parse_time(value):
+    text = str(value or "").strip()
+    if not text:
+        return 0.0
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return 0.0
+
+
+def _item_time(item):
+    if not isinstance(item, dict):
+        return 0.0
+    return _parse_time(item.get("createdAt") or item.get("updatedAt"))
 
 
 def _prune_daily_backups():

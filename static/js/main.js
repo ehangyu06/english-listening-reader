@@ -1,8 +1,8 @@
 import { initDb } from "./storage/db.js?v=20260825c";
-import { syncLibrary } from "./storage/sync.js?v=20260906p";
+import { syncLibrary } from "./storage/sync.js?v=20260906q";
 import { removeSampleLesson } from "./data/sample.js?v=20260825c";
 import { parseRoute, startRouter } from "./router.js?v=20260826i";
-import { renderApp } from "./app.js?v=20260906p";
+import { renderApp } from "./app.js?v=20260906q";
 import { bindLightboxHistory } from "./pages/lightbox.js?v=20260816w";
 import { bindDeleteClicks } from "./pages/deletes.js?v=20260906m";
 import { bindTitleEdit } from "./pages/titleEdit.js?v=20260906m";

@@ -81,9 +81,9 @@ export async function cloudGetState() {
   for (const row of lessonRows || []) {
     const lesson = row?.data && typeof row.data === "object" ? { ...row.data } : {};
     if (!lesson.id) lesson.id = row.id;
-    if (row.updated_at && (!lesson.updatedAt || String(row.updated_at) > String(lesson.updatedAt))) {
-      lesson.updatedAt = row.updated_at;
-    }
+    // Keep the payload timestamp as source of truth so a later upsert cannot
+    // resurrect deleted expressions just by refreshing updated_at.
+    if (!lesson.updatedAt && row.updated_at) lesson.updatedAt = row.updated_at;
     lessons.push(lesson);
   }
   const settings = {};
