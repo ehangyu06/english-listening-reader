@@ -1,6 +1,12 @@
 import { getAllLessons, saveLesson } from "../storage/lessons.js?v=20260906m";
 import { normalizeExpressions } from "../services/parser.js?v=20260825b";
-import { loadReviewListState, saveReviewJump, saveReviewListState } from "../storage/reviewJump.js?v=20260818g";
+import {
+  loadReviewBookmark,
+  loadReviewListState,
+  saveReviewBookmark,
+  saveReviewJump,
+  saveReviewListState,
+} from "../storage/reviewJump.js?v=20260906n";
 import { askConfirm } from "../ui/confirm.js?v=20260816p";
 import { openExampleEditor, openExampleFinder } from "../ui/examplePanel.js?v=20260823e";
 import { bindExamplePen, collectHighlightSnippets, remapHighlights, renderPenText } from "../ui/penHighlight.js?v=20260823o";
@@ -19,9 +25,16 @@ export async function renderReview(el) {
   }
 
   const countTab = (tab) => collect(lessons, tab).length;
+  let bookmark = loadReviewBookmark();
 
   el.innerHTML = `
     <div class="review-page">
+      <div class="review-jump-bar" role="toolbar" aria-label="복습 목록 이동">
+        <button type="button" class="review-jump-btn" data-review-jump="top">맨 위로</button>
+        <button type="button" class="review-jump-btn" data-review-jump="middle">중간으로</button>
+        <button type="button" class="review-jump-btn" data-review-jump="bottom">맨 아래로</button>
+        <button type="button" class="review-jump-btn" data-review-jump="bookmark">책갈피로</button>
+      </div>
       <p class="lead">중요 표현을 모아서 복습할 수 있습니다.</p>
       <div class="review-toolbar">
         <div class="tabs">
@@ -55,6 +68,60 @@ export async function renderReview(el) {
       scroll: list?.scrollTop || 0,
       itemId: focusId,
     });
+  };
+
+  const scrollToCard = (itemId, { toastMissing = false } = {}) => {
+    const list = el.querySelector("#review-list");
+    if (!list || !itemId) return false;
+    const card = list.querySelector(`[data-review-item="${itemId}"]`);
+    if (!card) {
+      if (toastMissing) toast("책갈피한 표현이 이 목록에 없습니다.");
+      return false;
+    }
+    list.querySelectorAll(".item-card.is-review-focus").forEach((node) => node.classList.remove("is-review-focus"));
+    card.classList.add("is-review-focus");
+    card.scrollIntoView({ block: "center" });
+    persist(itemId);
+    return true;
+  };
+
+  const jumpList = (where) => {
+    const list = el.querySelector("#review-list");
+    if (!list) return;
+    const cards = [...list.querySelectorAll("[data-review-item]")];
+    if (!cards.length) {
+      if (where === "bookmark") toast("책갈피를 먼저 눌러 주세요.");
+      return;
+    }
+    if (where === "top") {
+      list.scrollTop = 0;
+      cards[0]?.classList.add("is-review-focus");
+      persist(cards[0]?.getAttribute("data-review-item") || "");
+      return;
+    }
+    if (where === "bottom") {
+      const last = cards[cards.length - 1];
+      list.scrollTop = list.scrollHeight;
+      last?.scrollIntoView({ block: "end" });
+      persist(last?.getAttribute("data-review-item") || "");
+      return;
+    }
+    if (where === "middle") {
+      const mid = cards[Math.floor(cards.length / 2)];
+      if (!mid) return;
+      list.querySelectorAll(".item-card.is-review-focus").forEach((node) => node.classList.remove("is-review-focus"));
+      mid.classList.add("is-review-focus");
+      mid.scrollIntoView({ block: "center" });
+      persist(mid.getAttribute("data-review-item") || "");
+      return;
+    }
+    if (where === "bookmark") {
+      if (!bookmark?.itemId) {
+        toast("책갈피를 먼저 눌러 주세요.");
+        return;
+      }
+      scrollToCard(bookmark.itemId, { toastMissing: true });
+    }
   };
 
   el.querySelectorAll("[data-tab]").forEach((btn) => {
@@ -103,8 +170,9 @@ export async function renderReview(el) {
         const { item, lesson } = row;
         const meaning = item.meaning || item.note || "";
         const starred = isStarred(item, tab);
+        const bookmarked = bookmark?.itemId === item.id;
         return `
-          <article class="card item-card" data-review-item="${escapeHtml(item.id)}">
+          <article class="card item-card ${bookmarked ? "is-bookmarked" : ""}" data-review-item="${escapeHtml(item.id)}">
             <div class="item-en">${nl2br(item.phrase)}</div>
             <div class="item-ko">${nl2br(meaning)}</div>
             ${item.example ? `<div class="item-example" data-pen-field="example" data-pen-item="${escapeHtml(item.id)}" data-pen-lesson="${escapeHtml(lesson.id)}">${renderPenText(item.example, item.exampleHighlights)}</div>` : ""}
@@ -113,6 +181,7 @@ export async function renderReview(el) {
             <div class="item-actions">
               <button type="button" class="text-btn" data-open-page="${escapeHtml(lesson.id)}" data-item="${escapeHtml(item.id)}">페이지로</button>
               <button type="button" class="text-btn danger" data-remove-expression="${escapeHtml(lesson.id)}" data-item="${escapeHtml(item.id)}">지우기</button>
+              <button type="button" class="icon-bookmark ${bookmarked ? "is-on" : ""}" data-bookmark="${escapeHtml(lesson.id)}" data-item="${escapeHtml(item.id)}" aria-label="책갈피" title="책갈피">${bookmarked ? "책갈피됨" : "책갈피"}</button>
               <button class="icon-star ${starred ? "is-on" : ""}" data-toggle="${lesson.id}:${item.id}:${tab}">${starred ? "★" : "☆"}</button>
             </div>
             <div class="item-extra-actions">
@@ -142,6 +211,10 @@ export async function renderReview(el) {
     }
     if (Number.isFinite(state.scroll)) list.scrollTop = state.scroll;
   };
+
+  el.querySelectorAll("[data-review-jump]").forEach((btn) => {
+    btn.addEventListener("click", () => jumpList(btn.getAttribute("data-review-jump") || ""));
+  });
 
   el.querySelectorAll("[data-tab]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -182,6 +255,25 @@ export async function renderReview(el) {
       go(`#/lesson/${encodeURIComponent(lessonId)}?from=review`);
       return;
     }
+    const bookmarkBtn = event.target.closest("[data-bookmark]");
+    if (bookmarkBtn) {
+      const lessonId = bookmarkBtn.getAttribute("data-bookmark") || "";
+      const itemId = bookmarkBtn.getAttribute("data-item") || "";
+      const lesson = lessons.find((row) => row.id === lessonId);
+      const item = (lesson?.expressions || []).find((row) => row.id === itemId);
+      if (!item) return;
+      if (bookmark?.itemId === itemId) {
+        bookmark = null;
+        saveReviewBookmark(null);
+        toast("책갈피를 해제했습니다.");
+      } else {
+        bookmark = { itemId, lessonId, phrase: item.phrase || "" };
+        saveReviewBookmark(bookmark);
+        toast("책갈피를 꽂았습니다.");
+      }
+      draw();
+      return;
+    }
     const remove = event.target.closest("[data-remove-expression]");
     if (remove) {
       const lessonId = remove.getAttribute("data-remove-expression") || "";
@@ -199,6 +291,10 @@ export async function renderReview(el) {
         await saveLesson(lesson);
         toast("중요 표현에서 지웠습니다.");
         if (focusId === itemId) focusId = "";
+        if (bookmark?.itemId === itemId) {
+          bookmark = null;
+          saveReviewBookmark(null);
+        }
         persist();
         draw();
       } catch (error) {

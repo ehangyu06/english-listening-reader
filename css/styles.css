@@ -1028,6 +1028,50 @@ html.listen-wide .pen-bar {
   border-bottom: 1px solid var(--line);
 }
 
+.review-jump-bar {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0 0 10px;
+  padding: 0;
+}
+
+.review-jump-btn {
+  min-height: 40px;
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 12px;
+  padding: 8px 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.review-jump-btn:active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-2);
+}
+
+.icon-bookmark {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  min-height: 36px;
+  padding: 4px 6px;
+}
+
+.icon-bookmark.is-on {
+  color: var(--accent-2);
+}
+
+.item-card.is-bookmarked {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
 .review-toolbar .tabs,
 .review-toolbar .filters {
   margin: 0;
@@ -2772,6 +2816,10 @@ html.review-lock #app {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.review-page .lead {
+  flex: 0 0 auto;
 }
 
 .search-page {
