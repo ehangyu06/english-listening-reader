@@ -42,13 +42,41 @@ function newer(a, b) {
   return String(a?.updatedAt || "") >= String(b?.updatedAt || "");
 }
 
+function mergeItemLists(primary, secondary) {
+  const map = new Map();
+  for (const item of secondary || []) {
+    const key = item?.id || `phrase:${String(item?.phrase || "").trim().toLowerCase()}`;
+    if (key && key !== "phrase:") map.set(key, item);
+  }
+  for (const item of primary || []) {
+    const key = item?.id || `phrase:${String(item?.phrase || "").trim().toLowerCase()}`;
+    if (key && key !== "phrase:") map.set(key, item);
+  }
+  return [...map.values()];
+}
+
+function mergeLessons(preferred, other) {
+  if (!preferred) return other;
+  if (!other) return preferred;
+  const next = { ...preferred };
+  next.expressions = mergeItemLists(preferred.expressions, other.expressions);
+  next.listeningPoints = mergeItemLists(preferred.listeningPoints, other.listeningPoints);
+  return next;
+}
+
 function mergeStates(mac, cloud) {
   const lessons = new Map();
   for (const source of [mac, cloud]) {
     for (const lesson of source?.lessons || []) {
       if (!lesson?.id) continue;
       const current = lessons.get(lesson.id);
-      if (!current || newer(lesson, current)) lessons.set(lesson.id, lesson);
+      if (!current) {
+        lessons.set(lesson.id, lesson);
+        continue;
+      }
+      const preferred = newer(lesson, current) ? lesson : current;
+      const other = preferred === lesson ? current : lesson;
+      lessons.set(lesson.id, mergeLessons(preferred, other));
     }
   }
   const settings = { ...(mac?.settings || {}), ...(cloud?.settings || {}) };

@@ -1,4 +1,4 @@
-import { getAllLessons } from "../storage/lessons.js?v=20260825c";
+import { getAllLessons } from "../storage/lessons.js?v=20260906m";
 import { buildWordIndex, searchSimilarWords } from "../services/wordSearch.js?v=20260906k";
 import { loadSearchQueryState, saveSearchJump, saveSearchQueryState } from "../storage/searchJump.js?v=20260818k";
 import { escapeHtml, go } from "../utils.js?v=20260816p";

@@ -1,6 +1,7 @@
 import { SAMPLE_ID } from "../data/sample.js?v=20260816w";
 import { runStore, getSetting, setSetting } from "./db.js?v=20260825c";
-import { getAllLessons, saveLesson, normalizeLesson } from "./lessons.js?v=20260825c";
+import { getAllLessons, saveLesson, normalizeLesson } from "./lessons.js?v=20260906m";
+import { mergeLessons } from "./lessonMerge.js?v=20260906m";
 import {
   remoteGetState,
   remotePutLesson,
@@ -9,7 +10,7 @@ import {
   persistCloudToMac,
   ensureRemoteBlob,
   useMacRemote,
-} from "./remote.js?v=20260827i";
+} from "./remote.js?v=20260906m";
 
 function newer(a, b) {
   return String(a?.updatedAt || "") >= String(b?.updatedAt || "");
@@ -55,7 +56,13 @@ export async function syncLibrary() {
   for (const lesson of localLessons) {
     if (lesson.id === SAMPLE_ID) continue;
     const current = merged.get(lesson.id);
-    if (!current || newer(lesson, current)) merged.set(lesson.id, lesson);
+    if (!current) {
+      merged.set(lesson.id, lesson);
+      continue;
+    }
+    const preferred = newer(lesson, current) ? lesson : current;
+    const other = preferred === lesson ? current : lesson;
+    merged.set(lesson.id, mergeLessons(preferred, other));
   }
 
   for (const lesson of merged.values()) {

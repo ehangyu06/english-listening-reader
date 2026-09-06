@@ -2,16 +2,25 @@
 
 import json
 import re
+import shutil
 import threading
+from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data"
+BACKUP_DIR = DATA / "backups"
 LESSONS_FILE = DATA / "lessons.json"
 SETTINGS_FILE = DATA / "settings.json"
 FILES_FILE = DATA / "files.json"
 IMAGES_DIR = DATA / "images"
 AUDIO_DIR = DATA / "audio"
+
+PREV_BACKUP = BACKUP_DIR / "lessons.prev.json"
+DAILY_KEEP = 14
+# If a save drops this many expressions (or more than 30%), keep the missing ones.
+PROTECT_MIN_LOST = 5
+PROTECT_RATIO = 0.7
 
 SAFE_ID = re.compile(r"^[A-Za-z0-9._-]+$")
 _lock = threading.Lock()
@@ -19,6 +28,7 @@ _lock = threading.Lock()
 
 def ensure_dirs():
     DATA.mkdir(parents=True, exist_ok=True)
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     IMAGES_DIR.mkdir(parents=True, exist_ok=True)
     AUDIO_DIR.mkdir(parents=True, exist_ok=True)
     if not LESSONS_FILE.exists():
@@ -46,6 +56,92 @@ def check_id(value):
     return bool(value) and bool(SAFE_ID.match(str(value)))
 
 
+def _expression_count(lessons):
+    if not isinstance(lessons, dict):
+        return 0
+    total = 0
+    for lesson in lessons.values():
+        if isinstance(lesson, dict):
+            total += len(lesson.get("expressions") or [])
+    return total
+
+
+def _item_key(item):
+    if not isinstance(item, dict):
+        return ""
+    item_id = str(item.get("id") or "").strip()
+    if item_id:
+        return item_id
+    phrase = str(item.get("phrase") or "").strip().lower()
+    return ("phrase:" + phrase) if phrase else ""
+
+
+def _merge_items(primary, secondary):
+    merged = {}
+    for item in list(secondary or []) + list(primary or []):
+        key = _item_key(item)
+        if key:
+            merged[key] = item
+    return list(merged.values())
+
+
+def _should_protect_list(incoming, existing):
+    incoming_list = incoming if isinstance(incoming, list) else []
+    existing_list = existing if isinstance(existing, list) else []
+    incoming_n = len(incoming_list)
+    existing_n = len(existing_list)
+    if existing_n == 0 or incoming_n >= existing_n:
+        return False
+    lost = existing_n - incoming_n
+    return lost >= PROTECT_MIN_LOST or incoming_n < existing_n * PROTECT_RATIO
+
+
+def _protect_lesson(incoming, existing):
+    if not isinstance(existing, dict) or not isinstance(incoming, dict):
+        return incoming
+    next_lesson = dict(incoming)
+    if _should_protect_list(incoming.get("expressions"), existing.get("expressions")):
+        next_lesson["expressions"] = _merge_items(incoming.get("expressions"), existing.get("expressions"))
+    if _should_protect_list(incoming.get("listeningPoints"), existing.get("listeningPoints")):
+        next_lesson["listeningPoints"] = _merge_items(
+            incoming.get("listeningPoints"), existing.get("listeningPoints")
+        )
+    return next_lesson
+
+
+def _prune_daily_backups():
+    daily = sorted(BACKUP_DIR.glob("lessons.daily-*.json"))
+    for path in daily[:-DAILY_KEEP]:
+        try:
+            path.unlink()
+        except OSError:
+            pass
+
+
+def _backup_lessons_file():
+    """Keep an immediate previous copy and one snapshot per calendar day."""
+    ensure_dirs()
+    if not LESSONS_FILE.exists() or LESSONS_FILE.stat().st_size < 3:
+        return
+    try:
+        shutil.copy2(LESSONS_FILE, PREV_BACKUP)
+    except OSError:
+        pass
+    day = datetime.now().strftime("%Y-%m-%d")
+    daily_path = BACKUP_DIR / f"lessons.daily-{day}.json"
+    if not daily_path.exists():
+        try:
+            shutil.copy2(LESSONS_FILE, daily_path)
+        except OSError:
+            pass
+        _prune_daily_backups()
+
+
+def _write_lessons(lessons):
+    _backup_lessons_file()
+    _write_json(LESSONS_FILE, lessons)
+
+
 def get_state():
     ensure_dirs()
     with _lock:
@@ -56,6 +152,11 @@ def get_state():
         "lessons": list(lessons.values()) if isinstance(lessons, dict) else [],
         "settings": settings if isinstance(settings, dict) else {},
         "files": files if isinstance(files, dict) else {"images": {}, "audio": {}},
+        "safety": {
+            "expressions": _expression_count(lessons if isinstance(lessons, dict) else {}),
+            "prevBackup": PREV_BACKUP.exists(),
+            "dailyBackup": (BACKUP_DIR / f"lessons.daily-{datetime.now().strftime('%Y-%m-%d')}.json").exists(),
+        },
     }
 
 
@@ -67,9 +168,11 @@ def put_lesson(lesson):
         lessons = _read_json(LESSONS_FILE, {})
         if not isinstance(lessons, dict):
             lessons = {}
-        lessons[lesson["id"]] = lesson
-        _write_json(LESSONS_FILE, lessons)
-    return lesson
+        existing = lessons.get(lesson["id"])
+        protected = _protect_lesson(lesson, existing)
+        lessons[protected["id"]] = protected
+        _write_lessons(lessons)
+    return protected
 
 
 def delete_lesson(lesson_id):
@@ -80,7 +183,7 @@ def delete_lesson(lesson_id):
         lessons = _read_json(LESSONS_FILE, {})
         if isinstance(lessons, dict):
             lessons.pop(lesson_id, None)
-            _write_json(LESSONS_FILE, lessons)
+            _write_lessons(lessons)
 
 
 def put_setting(key, value):

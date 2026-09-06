@@ -1,6 +1,6 @@
 import { uid } from "./utils.js?v=20260816p";
 import { parsePairList, parseSerializedPairList, samePairListText } from "./services/parser.js?v=20260825b";
-import { MAX_PAGE_PHOTOS } from "./storage/lessons.js?v=20260825c";
+import { MAX_PAGE_PHOTOS } from "./storage/lessons.js?v=20260906m";
 import { remapHighlights } from "./ui/penHighlight.js?v=20260823o";
 
 export function createLesson({

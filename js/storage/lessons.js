@@ -2,7 +2,8 @@ import { runStore, getSetting, setSetting } from "./db.js?v=20260825c";
 import { naturalCompare, toast } from "../utils.js?v=20260816p";
 import { deleteAudio } from "./audio.js?v=20260825c";
 import { deleteImage } from "./images.js?v=20260825c";
-import { remoteDeleteLesson, remotePutLesson } from "./remote.js?v=20260825c";
+import { remoteDeleteLesson, remotePutLesson } from "./remote.js?v=20260906m";
+import { protectLesson } from "./lessonMerge.js?v=20260906m";
 import { ensureBookTitle, ensureChapter, listBookTitles, removeBookTitle, renameChapterInStore, renameStoredBookTitle } from "./books.js?v=20260816w";
 
 function cloneForDb(value) {
@@ -57,7 +58,8 @@ export async function getLesson(id) {
 
 export async function saveLesson(lesson, { silent = false } = {}) {
   try {
-    const clean = cloneForDb(normalizeLesson({ ...lesson }));
+    const existing = await getLesson(lesson.id);
+    const clean = cloneForDb(normalizeLesson(protectLesson({ ...lesson }, existing)));
     await runStore("lessons", "readwrite", (store) => store.put(clean));
     try {
       await remotePutLesson(clean);
@@ -70,7 +72,7 @@ export async function saveLesson(lesson, { silent = false } = {}) {
     } catch (error) {
       console.warn(error);
     }
-    return lesson;
+    return clean;
   } catch (error) {
     console.error(error);
     if (!silent) {

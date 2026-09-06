@@ -1,4 +1,4 @@
-import { getAllLessons, saveLesson } from "../storage/lessons.js?v=20260825c";
+import { getAllLessons, saveLesson } from "../storage/lessons.js?v=20260906m";
 import { normalizeExpressions } from "../services/parser.js?v=20260825b";
 import { loadReviewListState, saveReviewJump, saveReviewListState } from "../storage/reviewJump.js?v=20260818g";
 import { askConfirm } from "../ui/confirm.js?v=20260816p";

@@ -1,13 +1,13 @@
 import { stopAudio, getNowPlaying } from "./services/audioPlayer.js?v=20260829c";
 import { closeLightbox, isLightboxOpen } from "./pages/lightbox.js?v=20260816w";
-import { renderHome } from "./pages/home.js?v=20260902d";
-import { renderBooks, renderBookDetail } from "./pages/books.js?v=20260826c";
-import { renderLesson } from "./pages/lesson.js?v=20260829d";
-import { renderCompare } from "./pages/compare.js?v=20260829d";
-import { renderAdd } from "./pages/add.js?v=20260825c";
-import { renderReview } from "./pages/review.js?v=20260825c";
-import { renderSearch } from "./pages/search.js?v=20260906l";
-import { isListenPlaying, renderListen, stopListenSession } from "./pages/listen.js?v=20260902d";
+import { renderHome } from "./pages/home.js?v=20260906m";
+import { renderBooks, renderBookDetail } from "./pages/books.js?v=20260906m";
+import { renderLesson } from "./pages/lesson.js?v=20260906m";
+import { renderCompare } from "./pages/compare.js?v=20260906m";
+import { renderAdd } from "./pages/add.js?v=20260906m";
+import { renderReview } from "./pages/review.js?v=20260906m";
+import { renderSearch } from "./pages/search.js?v=20260906m";
+import { isListenPlaying, renderListen, stopListenSession } from "./pages/listen.js?v=20260906m";
 import { refreshNowPlaying } from "./ui/nowPlaying.js?v=20260829c";
 import { go, toast, escapeHtml } from "./utils.js?v=20260816p";
 
