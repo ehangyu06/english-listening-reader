@@ -267,9 +267,10 @@ export async function renderReview(el) {
         saveReviewBookmark(null);
         toast("책갈피를 해제했습니다.");
       } else {
+        const moved = Boolean(bookmark?.itemId);
         bookmark = { itemId, lessonId, phrase: item.phrase || "" };
         saveReviewBookmark(bookmark);
-        toast("책갈피를 꽂았습니다.");
+        toast(moved ? "책갈피를 이곳으로 옮겼습니다." : "책갈피를 꽂았습니다.");
       }
       draw();
       return;
