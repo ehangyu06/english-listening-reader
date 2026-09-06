@@ -90,25 +90,27 @@ export async function renderSearch(el) {
     }
 
     results.innerHTML = `<div class="stack">${matches.map(wordCard).join("")}</div>`;
+
+    const openWordResult = (key) => {
+      const chosen = matches.find((row) => row.key === key);
+      if (!chosen?.hits?.length) return;
+      if (chosen.hits.length === 1) {
+        openHit(chosen.word, chosen.hits[0]);
+        return;
+      }
+      selectedKey = key;
+      persist();
+      draw();
+    };
+
     results.querySelectorAll("[data-word-key]").forEach((btn) => {
       btn.addEventListener("click", () => {
-        const key = btn.getAttribute("data-word-key") || "";
-        const chosen = matches.find((row) => row.key === key);
-        if (!chosen) return;
-        if (chosen.hits.length === 1) {
-          openHit(chosen.word, chosen.hits[0]);
-          return;
-        }
-        selectedKey = key;
-        persist();
-        draw();
+        openWordResult(btn.getAttribute("data-word-key") || "");
       });
     });
-    results.querySelectorAll("[data-go-first]").forEach((btn) => {
+    results.querySelectorAll("[data-open-places]").forEach((btn) => {
       btn.addEventListener("click", () => {
-        const key = btn.getAttribute("data-go-first") || "";
-        const chosen = matches.find((row) => row.key === key);
-        if (chosen?.hits[0]) openHit(chosen.word, chosen.hits[0]);
+        openWordResult(btn.getAttribute("data-open-places") || "");
       });
     });
   };
@@ -127,7 +129,9 @@ export async function renderSearch(el) {
 
 function wordCard(entry) {
   const first = entry.hits[0];
-  const extra = entry.hits.length > 1 ? ` · ${entry.hits.length}곳` : "";
+  const many = entry.hits.length > 1;
+  const extra = many ? ` · ${entry.hits.length}곳` : "";
+  const actionLabel = many ? `${entry.hits.length}곳 보기` : "페이지로";
   const title =
     entry.kind === "phrase"
       ? `<div class="search-word">${escapeHtml(entry.word)}</div><div class="search-phrase-tag">중요 표현</div>`
@@ -139,8 +143,8 @@ function wordCard(entry) {
         <div class="search-snippet">${markedSnippet(first?.sentence || "", entry.kind === "phrase" ? "" : entry.word)}</div>
       </button>
       <div class="search-hit-meta">
-        <span class="muted">${escapeHtml(placeLabel(first))}${extra}</span>
-        <button type="button" class="text-btn" data-go-first="${escapeHtml(entry.key)}">페이지로</button>
+        <span class="muted">${escapeHtml(placesSummary(entry))}${extra}</span>
+        <button type="button" class="text-btn" data-open-places="${escapeHtml(entry.key)}">${actionLabel}</button>
       </div>
     </article>
   `;
@@ -151,7 +155,7 @@ function sentenceListMarkup(entry) {
     <div class="search-sentence-head">
       <button type="button" class="text-btn" data-back-words>← 비슷한 단어</button>
       <div class="search-word">${escapeHtml(entry.word)}</div>
-      <p class="hint">이 단어가 나온 문장을 고르면 해당 페이지로 이동합니다.</p>
+      <p class="hint">나온 곳을 고르면 해당 페이지로 이동합니다. 중요 표현과 원문이 함께 있을 수 있습니다.</p>
     </div>
     <div class="stack">${entry.hits
       .map(
@@ -179,8 +183,19 @@ function markedSnippet(sentence, word) {
   return text.replace(re, (match) => `<mark class="review-mark">${match}</mark>`);
 }
 
+function placesSummary(entry) {
+  const first = entry?.hits?.[0];
+  if (!first) return "";
+  const place = `${first.bookTitle} · ${first.chapter} · Page ${first.page}`;
+  const expr = (entry.hits || []).filter((hit) => hit.source === "expression").length;
+  const script = (entry.hits || []).length - expr;
+  if (expr && script) return `${place} · 중요 표현 ${expr} · 원문 ${script}`;
+  if (expr) return `${place} · 중요 표현`;
+  return place;
+}
+
 function placeLabel(hit) {
   if (!hit) return "";
   const place = `${hit.bookTitle} · ${hit.chapter} · Page ${hit.page}`;
-  return hit.source === "expression" ? `${place} · 중요 표현` : place;
+  return hit.source === "expression" ? `${place} · 중요 표현` : `${place} · 원문`;
 }
