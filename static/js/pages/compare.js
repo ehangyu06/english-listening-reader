@@ -1,4 +1,4 @@
-import { getLesson, saveLesson, getLessonImageIds } from "../storage/lessons.js?v=20260906r";
+import { getLesson, saveLesson, getLessonImageIds } from "../storage/lessons.js?v=20260906s";
 import { getImage } from "../storage/images.js?v=20260825c";
 import { parseScriptParts, scriptPartKindLabel, scriptForCopy, serializePairList, normalizeExpressions } from "../services/parser.js?v=20260829b";
 import { copyText, escapeHtml, nl2br, toast } from "../utils.js?v=20260816q";

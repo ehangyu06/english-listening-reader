@@ -10,8 +10,8 @@ import {
   cloudPutLesson,
   cloudPutSetting,
   isCloudEnabled,
-} from "./cloud.js?v=20260906r";
-import { mergeLessons } from "./lessonMerge.js?v=20260906r";
+} from "./cloud.js?v=20260906s";
+import { mergeLessons } from "./lessonMerge.js?v=20260906s";
 
 export function useMacRemote() {
   const host = location.hostname || "";

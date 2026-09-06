@@ -1,4 +1,4 @@
-import { deleteLesson, deleteBook, getLesson, getLessonsByBook } from "../storage/lessons.js?v=20260906r";
+import { deleteLesson, deleteBook, getLesson, getLessonsByBook } from "../storage/lessons.js?v=20260906s";
 import { parseRoute } from "../router.js?v=20260816p";
 import { askConfirm } from "../ui/confirm.js?v=20260816p";
 import { toast } from "../utils.js?v=20260816p";

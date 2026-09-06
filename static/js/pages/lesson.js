@@ -1,4 +1,4 @@
-import { getAllLessons, getLesson, saveLesson, getLessonsByBook, getNeighbors, updateLessonMeta, getLessonImageIds } from "../storage/lessons.js?v=20260906r";
+import { getAllLessons, getLesson, saveLesson, getLessonsByBook, getNeighbors, updateLessonMeta, getLessonImageIds } from "../storage/lessons.js?v=20260906s";
 import { listBookTitles } from "../storage/books.js?v=20260816w";
 import { getImage } from "../storage/images.js?v=20260825c";
 import { parseScriptParts, parseExpressions, scriptForCopy, scriptPartKindLabel, normalizeExpressions } from "../services/parser.js?v=20260825b";
@@ -9,7 +9,7 @@ import { openLightbox } from "./lightbox.js?v=20260816w";
 import { openBookPicker } from "../ui/bookPicker.js?v=20260816y";
 import { escapeHtml, formatDate, nl2br, toast, copyText, uid } from "../utils.js?v=20260816p";
 import { isFromReview, readReviewJump } from "../storage/reviewJump.js?v=20260906n";
-import { rememberDeletedIds } from "../storage/lessonMerge.js?v=20260906r";
+import { rememberDeletedIds } from "../storage/lessonMerge.js?v=20260906s";
 import { isFromSearch, readSearchJump } from "../storage/searchJump.js?v=20260818k";
 import { askConfirm } from "../ui/confirm.js?v=20260816p";
 import { openExampleEditor, openExampleFinder } from "../ui/examplePanel.js?v=20260823e";

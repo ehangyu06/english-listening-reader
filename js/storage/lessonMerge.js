@@ -1,8 +1,9 @@
 // Expression sync rules:
 // 1) deletedExpressionIds are remembered (union) and never resurrected.
-// 2) Non-deleted expressions are merged by id from both sides so new adds are kept.
-// 3) Legacy cleanup without tombstones: if one side is a smaller subset and the
-//    larger side only reintroduces older ids, drop those old extras.
+// 2) Expressions are merged by id from both sides so new adds are kept.
+// 3) Legacy cleanup without tombstones: only when the NEWER side is larger and
+//    the older side is a subset, drop old extras that look like resurrected deletes.
+//    (Do NOT drop extras just because a newer smaller edit is missing them.)
 
 function itemKey(item) {
   if (!item || typeof item !== "object") return "";
@@ -110,10 +111,11 @@ function mergeField(preferred, other, field) {
   const otherList = Array.isArray(other?.[field]) ? other[field] : [];
   let merged = mergeItemLists(preferredList, otherList);
 
-  if (preferredList.length >= otherList.length) {
+  // Only strip "resurrected deletes" when the preferred (newer) side is the larger one.
+  // If the newer side is smaller, missing items from the older side are treated as
+  // not-yet-synced adds and kept (unless tombstoned).
+  if (preferredList.length > otherList.length && isIdSubset(otherList, preferredList)) {
     merged = dropOldExtras(merged, preferredList, otherList, other);
-  } else {
-    merged = dropOldExtras(merged, otherList, preferredList, preferred);
   }
   return merged;
 }
@@ -126,25 +128,18 @@ export function protectLesson(incoming, existing) {
   next.deletedExpressionIds = [...deletedExpr];
   next.deletedListeningIds = [...deletedListen];
 
-  // Keep unique items from both sides, then remove tombstoned ids.
-  // Newer lesson wins per-id field conflicts via mergeItemLists(primary=incoming).
-  let expressions = mergeItemLists(incoming.expressions, existing.expressions);
-  let listeningPoints = mergeItemLists(incoming.listeningPoints, existing.listeningPoints);
-
   const incomingList = Array.isArray(incoming.expressions) ? incoming.expressions : [];
   const existingList = Array.isArray(existing.expressions) ? existing.expressions : [];
-  if (incomingList.length >= existingList.length) {
+  let expressions = mergeItemLists(incomingList, existingList);
+  if (incomingList.length > existingList.length && isIdSubset(existingList, incomingList)) {
     expressions = dropOldExtras(expressions, incomingList, existingList, existing);
-  } else {
-    expressions = dropOldExtras(expressions, existingList, incomingList, incoming);
   }
 
   const incomingListen = Array.isArray(incoming.listeningPoints) ? incoming.listeningPoints : [];
   const existingListen = Array.isArray(existing.listeningPoints) ? existing.listeningPoints : [];
-  if (incomingListen.length >= existingListen.length) {
+  let listeningPoints = mergeItemLists(incomingListen, existingListen);
+  if (incomingListen.length > existingListen.length && isIdSubset(existingListen, incomingListen)) {
     listeningPoints = dropOldExtras(listeningPoints, incomingListen, existingListen, existing);
-  } else {
-    listeningPoints = dropOldExtras(listeningPoints, existingListen, incomingListen, incoming);
   }
 
   next.expressions = filterDeleted(expressions, deletedExpr);
@@ -165,7 +160,6 @@ export function mergeLessons(preferred, other) {
   return next;
 }
 
-// Kept for callers/tests that still import the old name.
 export function shouldProtectList() {
   return false;
 }

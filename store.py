@@ -143,18 +143,15 @@ def _protect_lesson(incoming, existing):
     incoming_expr = list(incoming.get("expressions") or [])
     existing_expr = list(existing.get("expressions") or [])
     expressions = _merge_items(incoming_expr, existing_expr)
-    if len(incoming_expr) >= len(existing_expr):
+    # Only strip legacy resurrections when incoming (saved copy) is larger.
+    if len(incoming_expr) > len(existing_expr) and _ids_subset(existing_expr, incoming_expr):
         expressions = _drop_old_extras(expressions, incoming_expr, existing_expr, existing)
-    else:
-        expressions = _drop_old_extras(expressions, existing_expr, incoming_expr, incoming)
 
     incoming_listen = list(incoming.get("listeningPoints") or [])
     existing_listen = list(existing.get("listeningPoints") or [])
     listening = _merge_items(incoming_listen, existing_listen)
-    if len(incoming_listen) >= len(existing_listen):
+    if len(incoming_listen) > len(existing_listen) and _ids_subset(existing_listen, incoming_listen):
         listening = _drop_old_extras(listening, incoming_listen, existing_listen, existing)
-    else:
-        listening = _drop_old_extras(listening, existing_listen, incoming_listen, incoming)
 
     next_lesson["expressions"] = [
         item

@@ -1,7 +1,7 @@
-import { getAllLessons, hasAudio } from "../storage/lessons.js?v=20260906r";
+import { getAllLessons, hasAudio } from "../storage/lessons.js?v=20260906s";
 import { getSetting } from "../storage/db.js?v=20260825c";
-import { remoteStatus, persistCloudToMac, macCloudPushStatus } from "../storage/remote.js?v=20260906r";
-import { isCloudEnabled } from "../storage/cloud.js?v=20260906r";
+import { remoteStatus, persistCloudToMac, macCloudPushStatus } from "../storage/remote.js?v=20260906s";
+import { isCloudEnabled } from "../storage/cloud.js?v=20260906s";
 import { clearCloudConfig, getCloudConfig, saveCloudConfig } from "../config.js?v=20260827i";
 import { scriptPreviewLines } from "../services/parser.js?v=20260816p";
 import { escapeHtml, formatDate, toast } from "../utils.js?v=20260816p";

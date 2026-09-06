@@ -105,8 +105,8 @@ export async function ensureSampleLesson() {
 }
 
 export async function removeSampleLesson() {
-  const { getLesson, deleteLesson } = await import("../storage/lessons.js?v=20260906r");
-  const { remoteDeleteLesson } = await import("../storage/remote.js?v=20260906r");
+  const { getLesson, deleteLesson } = await import("../storage/lessons.js?v=20260906s");
+  const { remoteDeleteLesson } = await import("../storage/remote.js?v=20260906s");
   try {
     const existing = await getLesson(SAMPLE_ID);
     if (existing) await deleteLesson(SAMPLE_ID);

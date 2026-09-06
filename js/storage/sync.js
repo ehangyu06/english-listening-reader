@@ -1,7 +1,7 @@
 import { SAMPLE_ID } from "../data/sample.js?v=20260816w";
 import { runStore, getSetting, setSetting } from "./db.js?v=20260825c";
-import { getAllLessons, saveLesson, normalizeLesson } from "./lessons.js?v=20260906r";
-import { mergeLessons } from "./lessonMerge.js?v=20260906r";
+import { getAllLessons, saveLesson, normalizeLesson } from "./lessons.js?v=20260906s";
+import { mergeLessons } from "./lessonMerge.js?v=20260906s";
 import {
   remoteGetState,
   remotePutLesson,
@@ -10,7 +10,7 @@ import {
   persistCloudToMac,
   ensureRemoteBlob,
   useMacRemote,
-} from "./remote.js?v=20260906r";
+} from "./remote.js?v=20260906s";
 
 function newer(a, b) {
   return String(a?.updatedAt || "") >= String(b?.updatedAt || "");
