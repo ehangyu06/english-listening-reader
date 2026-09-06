@@ -1,5 +1,5 @@
 import { getAllLessons } from "../storage/lessons.js?v=20260825c";
-import { buildWordIndex, searchSimilarWords } from "../services/wordSearch.js?v=20260825b";
+import { buildWordIndex, searchSimilarWords } from "../services/wordSearch.js?v=20260906k";
 import { loadSearchQueryState, saveSearchJump, saveSearchQueryState } from "../storage/searchJump.js?v=20260818k";
 import { escapeHtml, go } from "../utils.js?v=20260816p";
 
@@ -12,9 +12,9 @@ export async function renderSearch(el) {
 
   el.innerHTML = `
     <div class="search-page">
-      <p class="lead">원문 스크립트와 직접 입력한 중요 표현을 함께 찾습니다. 철자가 조금 달라도 비슷한 단어를 보여 줍니다.</p>
+      <p class="lead">중요 표현을 먼저 찾고, 그다음 원문에서 비슷한 단어를 보여 줍니다. 숙어를 통째로 넣어도 됩니다.</p>
       <label class="search-field">
-        단어 검색
+        단어 · 숙어 검색
         <input
           id="word-search-input"
           type="search"
@@ -22,7 +22,7 @@ export async function renderSearch(el) {
           autocomplete="off"
           autocapitalize="off"
           spellcheck="false"
-          placeholder="예: kneadded, paitence"
+          placeholder="예: be utterly unfazed"
           value="${escapeHtml(query)}"
         />
       </label>
@@ -128,11 +128,15 @@ export async function renderSearch(el) {
 function wordCard(entry) {
   const first = entry.hits[0];
   const extra = entry.hits.length > 1 ? ` · ${entry.hits.length}곳` : "";
+  const title =
+    entry.kind === "phrase"
+      ? `<div class="search-word">${escapeHtml(entry.word)}</div><div class="search-phrase-tag">중요 표현</div>`
+      : `<div class="search-word">${escapeHtml(entry.word)}</div>`;
   return `
     <article class="card search-hit-card">
       <button type="button" class="search-hit-main" data-word-key="${escapeHtml(entry.key)}">
-        <div class="search-word">${escapeHtml(entry.word)}</div>
-        <div class="search-snippet">${markedSnippet(first?.sentence || "", entry.word)}</div>
+        ${title}
+        <div class="search-snippet">${markedSnippet(first?.sentence || "", entry.kind === "phrase" ? "" : entry.word)}</div>
       </button>
       <div class="search-hit-meta">
         <span class="muted">${escapeHtml(placeLabel(first))}${extra}</span>

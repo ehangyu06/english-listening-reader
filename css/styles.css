@@ -2851,6 +2851,13 @@ html.review-lock #app {
   letter-spacing: -0.02em;
 }
 
+.search-phrase-tag {
+  margin-top: 2px;
+  color: var(--accent-2);
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .search-snippet {
   margin: 6px 0 8px;
   font-family: var(--font-en);
