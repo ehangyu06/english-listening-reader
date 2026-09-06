@@ -1,5 +1,5 @@
 import { uid, escapeHtml, formatTime, formatBytes, toast } from "../utils.js?v=20260816p";
-import { saveLesson, getFullAudioTrack } from "../storage/lessons.js?v=20260906m";
+import { saveLesson, getFullAudioTrack } from "../storage/lessons.js?v=20260906p";
 import { saveAudio, getAudio, deleteAudio, readAudioDuration, isAudioFile, MAX_AUDIO_BYTES, audioFileInputAttrs } from "../storage/audio.js?v=20260825c";
 import { attachAudio, stopAudio, getAudioElement, isLessonPlaying, setNowPlaying, playAudio, audioIsPlayable } from "../services/audioPlayer.js?v=20260829c";
 

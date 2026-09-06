@@ -18,9 +18,10 @@ AUDIO_DIR = DATA / "audio"
 
 PREV_BACKUP = BACKUP_DIR / "lessons.prev.json"
 DAILY_KEEP = 14
-# If a save drops this many expressions (or more than 30%), keep the missing ones.
-PROTECT_MIN_LOST = 5
-PROTECT_RATIO = 0.7
+# If a save drops more than half the expressions (or 20+), keep the missing ones.
+# Smaller intentional cleanups must be allowed to sync.
+PROTECT_MIN_LOST = 20
+PROTECT_RATIO = 0.5
 
 SAFE_ID = re.compile(r"^[A-Za-z0-9._-]+$")
 _lock = threading.Lock()
@@ -100,6 +101,12 @@ def _protect_lesson(incoming, existing):
     if not isinstance(existing, dict) or not isinstance(incoming, dict):
         return incoming
     next_lesson = dict(incoming)
+    incoming_newer = str(incoming.get("updatedAt") or "") >= str(existing.get("updatedAt") or "")
+    catastrophic = _should_protect_list(
+        incoming.get("expressions"), existing.get("expressions")
+    ) or _should_protect_list(incoming.get("listeningPoints"), existing.get("listeningPoints"))
+    if incoming_newer and not catastrophic:
+        return next_lesson
     if _should_protect_list(incoming.get("expressions"), existing.get("expressions")):
         next_lesson["expressions"] = _merge_items(incoming.get("expressions"), existing.get("expressions"))
     if _should_protect_list(incoming.get("listeningPoints"), existing.get("listeningPoints")):

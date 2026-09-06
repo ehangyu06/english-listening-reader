@@ -11,6 +11,7 @@ import {
   cloudPutSetting,
   isCloudEnabled,
 } from "./cloud.js?v=20260827i";
+import { mergeLessons } from "./lessonMerge.js?v=20260906p";
 
 export function useMacRemote() {
   const host = location.hostname || "";
@@ -40,28 +41,6 @@ async function quiet(label, fn) {
 
 function newer(a, b) {
   return String(a?.updatedAt || "") >= String(b?.updatedAt || "");
-}
-
-function mergeItemLists(primary, secondary) {
-  const map = new Map();
-  for (const item of secondary || []) {
-    const key = item?.id || `phrase:${String(item?.phrase || "").trim().toLowerCase()}`;
-    if (key && key !== "phrase:") map.set(key, item);
-  }
-  for (const item of primary || []) {
-    const key = item?.id || `phrase:${String(item?.phrase || "").trim().toLowerCase()}`;
-    if (key && key !== "phrase:") map.set(key, item);
-  }
-  return [...map.values()];
-}
-
-function mergeLessons(preferred, other) {
-  if (!preferred) return other;
-  if (!other) return preferred;
-  const next = { ...preferred };
-  next.expressions = mergeItemLists(preferred.expressions, other.expressions);
-  next.listeningPoints = mergeItemLists(preferred.listeningPoints, other.listeningPoints);
-  return next;
 }
 
 function mergeStates(mac, cloud) {

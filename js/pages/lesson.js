@@ -1,4 +1,4 @@
-import { getAllLessons, getLesson, saveLesson, getLessonsByBook, getNeighbors, updateLessonMeta, getLessonImageIds } from "../storage/lessons.js?v=20260906m";
+import { getAllLessons, getLesson, saveLesson, getLessonsByBook, getNeighbors, updateLessonMeta, getLessonImageIds } from "../storage/lessons.js?v=20260906p";
 import { listBookTitles } from "../storage/books.js?v=20260816w";
 import { getImage } from "../storage/images.js?v=20260825c";
 import { parseScriptParts, parseExpressions, scriptForCopy, scriptPartKindLabel, normalizeExpressions } from "../services/parser.js?v=20260825b";

@@ -1,5 +1,5 @@
 import { runStore } from "./db.js?v=20260825c";
-import { remoteDeleteBlob, remoteGetBlob, remotePutBlob } from "./remote.js?v=20260906m";
+import { remoteDeleteBlob, remoteGetBlob, remotePutBlob } from "./remote.js?v=20260906p";
 
 export const MAX_AUDIO_BYTES = 40 * 1024 * 1024;
 

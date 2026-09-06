@@ -1,4 +1,4 @@
-import { getAllLessons, getLessonsByBook, groupBooks, groupByChapter, hasAudio, renameBook, renameChapter } from "../storage/lessons.js?v=20260906m";
+import { getAllLessons, getLessonsByBook, groupBooks, groupByChapter, hasAudio, renameBook, renameChapter } from "../storage/lessons.js?v=20260906p";
 import { addBookTitle, addChapter, getChaptersForBook, getStoredBookTitles, removeChapter } from "../storage/books.js?v=20260816w";
 import { scriptPreview } from "./home.js?v=20260826c";
 import { escapeHtml, formatDate, toast } from "../utils.js?v=20260816p";

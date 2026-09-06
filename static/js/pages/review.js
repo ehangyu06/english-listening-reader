@@ -1,4 +1,4 @@
-import { getAllLessons, saveLesson } from "../storage/lessons.js?v=20260906m";
+import { getAllLessons, saveLesson } from "../storage/lessons.js?v=20260906p";
 import { normalizeExpressions } from "../services/parser.js?v=20260825b";
 import {
   loadReviewBookmark,

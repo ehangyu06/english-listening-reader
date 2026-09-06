@@ -1,5 +1,7 @@
-const PROTECT_MIN_LOST = 5;
-const PROTECT_RATIO = 0.7;
+// Protect only against catastrophic shrink (half gone / 20+ missing).
+// Normal cleanup deletes must sync to other devices.
+const PROTECT_MIN_LOST = 20;
+const PROTECT_RATIO = 0.5;
 
 function itemKey(item) {
   if (!item || typeof item !== "object") return "";
@@ -7,6 +9,10 @@ function itemKey(item) {
   if (id) return id;
   const phrase = String(item.phrase || "").trim().toLowerCase();
   return phrase ? `phrase:${phrase}` : "";
+}
+
+function isNewer(a, b) {
+  return String(a?.updatedAt || "") >= String(b?.updatedAt || "");
 }
 
 export function mergeItemLists(primary, secondary) {
@@ -33,6 +39,12 @@ export function shouldProtectList(incoming, existing) {
 export function protectLesson(incoming, existing) {
   if (!incoming || !existing) return incoming;
   const next = { ...incoming };
+  const trustIncoming =
+    isNewer(incoming, existing) &&
+    !shouldProtectList(incoming.expressions, existing.expressions) &&
+    !shouldProtectList(incoming.listeningPoints, existing.listeningPoints);
+  if (trustIncoming) return next;
+
   if (shouldProtectList(incoming.expressions, existing.expressions)) {
     next.expressions = mergeItemLists(incoming.expressions, existing.expressions);
   }
@@ -46,7 +58,15 @@ export function mergeLessons(preferred, other) {
   if (!preferred) return other;
   if (!other) return preferred;
   const next = { ...preferred };
-  next.expressions = mergeItemLists(preferred.expressions, other.expressions);
-  next.listeningPoints = mergeItemLists(preferred.listeningPoints, other.listeningPoints);
+  if (shouldProtectList(preferred.expressions, other.expressions)) {
+    next.expressions = mergeItemLists(preferred.expressions, other.expressions);
+  } else {
+    next.expressions = Array.isArray(preferred.expressions) ? preferred.expressions : [];
+  }
+  if (shouldProtectList(preferred.listeningPoints, other.listeningPoints)) {
+    next.listeningPoints = mergeItemLists(preferred.listeningPoints, other.listeningPoints);
+  } else {
+    next.listeningPoints = Array.isArray(preferred.listeningPoints) ? preferred.listeningPoints : [];
+  }
   return next;
 }
