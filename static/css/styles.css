@@ -2725,8 +2725,9 @@ html.listen-play-lock #app {
 html.review-lock,
 html.review-lock body,
 html.review-lock #app {
-  height: 100%;
-  height: 100dvh;
+  height: var(--app-vh, 100svh);
+  max-height: var(--app-vh, 100svh);
+  min-height: 0;
   overflow: hidden;
   padding-bottom: 0;
 }
@@ -2734,6 +2735,8 @@ html.review-lock #app {
 .shell-review,
 .shell-search {
   height: 100%;
+  max-height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
