@@ -1,4 +1,4 @@
-import { getAllLessons, getLesson, saveLesson, getLessonImageIds, MAX_PAGE_PHOTOS } from "../storage/lessons.js?v=20260906s";
+import { getAllLessons, getLesson, saveLesson, getLessonImageIds, MAX_PAGE_PHOTOS } from "../storage/lessons.js?v=20260914a";
 import { listBookTitles } from "../storage/books.js?v=20260816w";
 import { getSetting, setSetting } from "../storage/db.js?v=20260825c";
 import { saveImage, getImage, deleteImage, compressImageFile } from "../storage/images.js?v=20260825c";
@@ -137,7 +137,7 @@ export async function renderAdd(el, editId) {
 
       <div class="block">
         <div class="block-title">원본 페이지 사진</div>
-        <p class="hint">개인 학습 참고용입니다. 사진은 최대 10장까지 이 기기의 IndexedDB에만 저장됩니다.</p>
+        <p class="hint">개인 학습 참고용입니다. 사진은 최대 ${MAX_PAGE_PHOTOS}장까지 이 기기의 IndexedDB에만 저장됩니다.</p>
         <div class="photo-add-row">
           <input id="photo-input" class="photo-file-input" type="file" accept="image/*" multiple />
           <span class="muted" id="photo-count"></span>
@@ -258,12 +258,12 @@ export async function renderAdd(el, editId) {
     if (!files.length) return;
     const room = MAX_PAGE_PHOTOS - photos.length;
     if (room <= 0) {
-      toast("사진은 최대 10장까지 넣을 수 있습니다.");
+      toast(`사진은 최대 ${MAX_PAGE_PHOTOS}장까지 넣을 수 있습니다.`);
       return;
     }
     const chosen = files.slice(0, room);
     if (files.length > room) {
-      toast("사진은 최대 10장까지 넣을 수 있습니다.");
+      toast(`사진은 최대 ${MAX_PAGE_PHOTOS}장까지 넣을 수 있습니다.`);
     }
     for (const file of chosen) {
       photos.push({

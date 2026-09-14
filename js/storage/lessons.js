@@ -20,7 +20,7 @@ export function normalizeLesson(lesson) {
   return lesson;
 }
 
-export const MAX_PAGE_PHOTOS = 10;
+export const MAX_PAGE_PHOTOS = 30;
 
 export function getLessonImageIds(lesson) {
   if (!lesson) return [];

@@ -1,4 +1,4 @@
-import { getAllLessons, getLessonsByBook, groupBooks, hasAudio, getFullAudioTrack } from "../storage/lessons.js?v=20260906s";
+import { getAllLessons, getLessonsByBook, groupBooks, hasAudio, getFullAudioTrack } from "../storage/lessons.js?v=20260914a";
 import { getStoredBookTitles } from "../storage/books.js?v=20260816w";
 import { getAudio } from "../storage/audio.js?v=20260825c";
 import { getAudioElement, stopAudio, swapAudio, playAudio } from "../services/audioPlayer.js?v=20260829c";

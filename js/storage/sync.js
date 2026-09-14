@@ -1,6 +1,6 @@
 import { SAMPLE_ID } from "../data/sample.js?v=20260816w";
 import { runStore, getSetting, setSetting } from "./db.js?v=20260825c";
-import { getAllLessons, saveLesson, normalizeLesson } from "./lessons.js?v=20260906s";
+import { getAllLessons, saveLesson, normalizeLesson } from "./lessons.js?v=20260914a";
 import { mergeLessons } from "./lessonMerge.js?v=20260906s";
 import {
   remoteGetState,
