@@ -1,4 +1,4 @@
-import { getAllLessons, hasAudio } from "../storage/lessons.js?v=20260914b";
+import { getAllLessons, hasAudio } from "../storage/lessons.js?v=20260914c";
 import { getSetting } from "../storage/db.js?v=20260825c";
 import { remoteStatus, persistCloudToMac, macCloudPushStatus } from "../storage/remote.js?v=20260906s";
 import { isCloudEnabled } from "../storage/cloud.js?v=20260906s";

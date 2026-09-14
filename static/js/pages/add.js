@@ -1,9 +1,9 @@
-import { getAllLessons, getLesson, saveLesson, getLessonImageIds, MAX_PAGE_PHOTOS } from "../storage/lessons.js?v=20260914b";
+import { getAllLessons, getLesson, saveLesson, getLessonImageIds, MAX_PAGE_PHOTOS } from "../storage/lessons.js?v=20260914c";
 import { listBookTitles } from "../storage/books.js?v=20260816w";
 import { getSetting, setSetting } from "../storage/db.js?v=20260825c";
 import { saveImage, getImage, deleteImage, compressImageFile } from "../storage/images.js?v=20260825c";
 import { parseAiResponse, serializePairList, describeParseResult, AI_PROMPT_TEMPLATE, normalizeExpressions } from "../services/parser.js?v=20260825b";
-import { createLesson } from "../models.js?v=20260914b";
+import { createLesson } from "../models.js?v=20260914c";
 import { escapeHtml, todayInputValue, toast, uid, go } from "../utils.js?v=20260816p";
 
 const NATURAL_AI_OUTPUT = `Listening Script
