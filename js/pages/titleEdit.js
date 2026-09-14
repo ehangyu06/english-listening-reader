@@ -1,4 +1,4 @@
-import { renameBook, updateLessonMeta } from "../storage/lessons.js?v=20260914a";
+import { renameBook, updateLessonMeta } from "../storage/lessons.js?v=20260914b";
 import { parseRoute } from "../router.js?v=20260816p";
 import { toast } from "../utils.js?v=20260816p";
 
